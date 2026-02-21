@@ -1,0 +1,24 @@
+[project]
+name = "samplify"
+version = "0.1.0"
+description = "LLM-powered harmonization of inconsistent bioinformatics sample names"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["bioinformatics", "metadata", "sample-names", "harmonization", "llm"]
+dependencies = [
+    "openai>=2.21.0",
+    "python-dotenv>=1.2.1",
+    "rich>=14.3.3",
+]
+
+[project.scripts]
+samplify = "samplify.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+markers = ["live: requires a real OpenRouter API key (deselect with -m 'not live')"]
