@@ -8,6 +8,7 @@ license = { text = "MIT" }
 keywords = ["bioinformatics", "metadata", "sample-names", "harmonization", "llm"]
 dependencies = [
     "openai>=2.21.0",
+    "pandas>=2.3.3",
     "python-dotenv>=1.2.1",
     "rich>=14.3.3",
 ]
