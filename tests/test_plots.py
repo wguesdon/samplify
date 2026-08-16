@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from samplify import cli
 from samplify.csv_processor import propose_csv
 from samplify.mapping import MappingFile
 
@@ -61,3 +62,23 @@ def test_qc_figure_accepts_an_explicit_title(tmp_path):
     mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="rules")
     figure = qc_figure(mapping, path=str(tmp_path / "qc.png"), title="A cohort")
     assert figure._suptitle.get_text() == "A cohort"
+
+
+def test_cli_reports_a_missing_matplotlib(tmp_path, monkeypatch, capsys):
+    """The optional dependency must reach the user as a message, not a traceback.
+
+    plots.py imports matplotlib inside qc_figure, so the call and not the import
+    is what raises. The CLI has to catch it there.
+    """
+
+    def _no_matplotlib(*args, **kwargs):
+        raise ImportError('Install it with: uv add "samplify[plot]"')
+
+    monkeypatch.setattr("samplify.plots.qc_figure", _no_matplotlib)
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="rules")
+
+    code = cli._write_plot(mapping, str(tmp_path / "qc.png"))
+
+    # The extra name has to survive the print. rich reads [plot] as a style tag.
+    assert code == 1
+    assert 'uv add "samplify[plot]"' in capsys.readouterr().out

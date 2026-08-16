@@ -261,7 +261,7 @@ colour. samplify also limits the matrix to forty names, because more than forty
 labels are not readable. The title then gives the number of groups in the figure.
 
 matplotlib is an optional dependency. If matplotlib is absent, `samplify plot`
-stops with an `ImportError`, and the message gives the install command.
+prints the install command and exits with the status 1.
 
 ## The Python API
 

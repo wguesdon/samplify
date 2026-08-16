@@ -9,6 +9,18 @@ command surface or a change that alters which names group together. Those bump
 the major version. A new backend or a new command bumps the minor version. A fix
 that leaves the grouping unchanged bumps the patch version.
 
+## [Unreleased]
+
+### Fixed
+
+- `samplify plot` and `samplify propose --plot` now print the install command
+  when matplotlib is absent. The call to `qc_figure` sat outside the `try` block
+  in `samplify/cli.py`, and `plots.py` imports matplotlib inside `qc_figure`, so
+  the missing optional dependency reached the user as a traceback.
+- An error message now keeps the square brackets of its text. rich read the
+  `[plot]` of `uv add "samplify[plot]"` as a style tag and dropped it, so the
+  install command that the user read was wrong.
+
 ## [0.2.0] - 2026-08-16
 
 The tool now finds the sample names that are one sample spelled several ways,

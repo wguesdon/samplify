@@ -1,12 +1,14 @@
 """Command-line interface for samplify.
 
-Four commands. The first proposes, the second lets a person decide, the third
-applies the decisions, and the fourth is a quick look that writes nothing.
+Five commands. The first proposes, the second lets a person decide, the third
+applies the decisions, the fourth is a quick look that writes nothing, and the
+fifth redraws the figure from a mapping file.
 
     samplify propose data.csv --column sample_id -o mapping.json
     samplify review mapping.json
     samplify apply mapping.json --output clean.csv
     samplify names "sample_1_batch_1" "sample1_batch2" "sample-1-b3"
+    samplify plot mapping.json -o qc.png
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
@@ -37,6 +40,18 @@ console = Console()
 
 
 # ── Rendering ──────────────────────────────────────────────────────────────
+
+
+def _print_error(message: object) -> None:
+    """Print an error message in red.
+
+    The message text is escaped, because rich reads ``[plot]`` in
+    ``uv add "samplify[plot]"`` as a style tag and drops it.
+
+    Args:
+        message: The exception or the text to print.
+    """
+    console.print(f"[red]Error:[/red] {escape(str(message))}")
 
 
 def _print_diagnosis(findings: dict) -> None:
@@ -123,7 +138,7 @@ def _run_propose(args: argparse.Namespace) -> int:
             model=args.model,
         )
     except (ValueError, FileNotFoundError) as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        _print_error(exc)
         return 1
 
     _print_diagnosis(result.diagnosis)
@@ -167,13 +182,17 @@ def _write_plot(result: MappingFile, path: str, title: str | None = None, dpi: i
     Returns:
         The exit code.
     """
+    # matplotlib is imported inside qc_figure, not at the top of plots.py, so
+    # the call has to sit in the try block as well. Without it the missing
+    # optional dependency reaches the user as a traceback.
     try:
         from .plots import qc_figure
+
+        qc_figure(result, path=path, title=title, dpi=dpi)
     except ImportError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        _print_error(exc)
         return 1
 
-    qc_figure(result, path=path, title=title, dpi=dpi)
     console.print(f"[green]QC figure written to {path}[/green]")
     return 0
 
@@ -183,7 +202,7 @@ def _run_plot(args: argparse.Namespace) -> int:
     try:
         result = mapping_module.read(args.mapping)
     except (ValueError, FileNotFoundError) as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        _print_error(exc)
         return 1
     return _write_plot(result, args.output, title=args.title, dpi=args.dpi)
 
@@ -228,7 +247,7 @@ def _run_review(args: argparse.Namespace) -> int:
     try:
         result = mapping_module.read(args.mapping)
     except (ValueError, FileNotFoundError) as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        _print_error(exc)
         return 1
 
     pending = result.pending()
@@ -311,7 +330,7 @@ def _run_apply(args: argparse.Namespace) -> int:
             mapping_path=str(args.mapping),
         )
     except (ValueError, FileNotFoundError) as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        _print_error(exc)
         return 1
 
     summary = log["summary"]
@@ -345,7 +364,7 @@ def _run_names(args: argparse.Namespace) -> int:
             with open(args.file) as fh:
                 names.extend(line.strip() for line in fh if line.strip())
         except FileNotFoundError:
-            console.print(f"[red]Error:[/red] File not found: {args.file}")
+            _print_error(f"File not found: {args.file}")
             return 1
 
     if not names:
@@ -368,7 +387,7 @@ def _run_names(args: argparse.Namespace) -> int:
             )
             pattern = f"offline, method={args.method}"
     except ValueError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        _print_error(exc)
         return 1
 
     if args.json_output:
