@@ -46,13 +46,23 @@ OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
-The second is [ollama](https://ollama.com), which runs a model on your own
-machine. It needs no key, and the sample names never leave the machine.
+## A local model with ollama
+
+The second service is [ollama](https://ollama.com), which runs the model on your
+own machine. It needs no key, and the sample names never leave the machine.
 
 ```bash
 ollama pull qwen3.5:9b
 uv run samplify propose data.csv -c sample_id -M auto --provider ollama
 ```
+
+The option `--model` chooses another model. The option `--base-url` and the
+variable `OLLAMA_HOST` point at another machine. A local model on a CPU is
+slower than a hosted one, so `--timeout` sets how long samplify waits, and the
+default is 300 seconds.
+
+The mapping file records the service that answered, so a file written this way
+holds `"provider": "ollama"`.
 
 ## Example
 
