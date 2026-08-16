@@ -27,7 +27,15 @@ from rich.table import Table
 from . import mapping as mapping_module
 from . import matching
 from .csv_processor import apply_mapping, propose_csv
-from .harmonizer import harmonize
+from .harmonizer import (
+    DEFAULT_MODEL,
+    DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OLLAMA_TIMEOUT,
+    DEFAULT_PROVIDER,
+    OLLAMA_BASE_URL,
+    PROVIDERS,
+    harmonize,
+)
 from .mapping import (
     STATUS_ACCEPTED,
     STATUS_EDITED,
@@ -37,6 +45,22 @@ from .mapping import (
 )
 
 console = Console()
+
+_PROVIDER_HELP = (
+    f"Which service answers, for the llm and auto backends (default: {DEFAULT_PROVIDER}). "
+    "ollama runs a model on this machine and needs no API key."
+)
+_MODEL_HELP = (
+    f"The model string (default: {DEFAULT_MODEL} for openrouter, "
+    f"{DEFAULT_OLLAMA_MODEL} for ollama)."
+)
+_BASE_URL_HELP = (
+    f"The server to call (default: the OpenRouter API, or {OLLAMA_BASE_URL} for ollama). "
+    "OLLAMA_HOST is read when it is set."
+)
+_TIMEOUT_HELP = (
+    f"Seconds to wait for the model (default: {DEFAULT_OLLAMA_TIMEOUT:.0f} for ollama)."
+)
 
 
 # ── Rendering ──────────────────────────────────────────────────────────────
@@ -136,6 +160,9 @@ def _run_propose(args: argparse.Namespace) -> int:
             method=args.method,
             threshold=args.threshold,
             model=args.model,
+            provider=args.provider,
+            base_url=args.base_url,
+            timeout=args.timeout,
         )
     except (ValueError, FileNotFoundError) as exc:
         _print_error(exc)
@@ -373,7 +400,13 @@ def _run_names(args: argparse.Namespace) -> int:
 
     try:
         if args.method == "llm":
-            result = harmonize(names, model=args.model)
+            result = harmonize(
+                names,
+                model=args.model,
+                provider=args.provider,
+                base_url=args.base_url,
+                timeout=args.timeout,
+            )
             pairs = sorted(result["mapping"].items())
             pattern = result.get("canonical_pattern", "")
         else:
@@ -447,7 +480,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Lowest similarity that still counts as a match (default: 0.85).",
     )
     propose_parser.add_argument(
-        "--model", "-m", default=None, help="OpenRouter model string (default: openai/gpt-4o-mini)."
+        "--model", "-m", default=None, help=_MODEL_HELP
+    )
+    propose_parser.add_argument(
+        "--provider", "-p", default=DEFAULT_PROVIDER, choices=list(PROVIDERS), help=_PROVIDER_HELP
+    )
+    propose_parser.add_argument("--base-url", dest="base_url", default=None, help=_BASE_URL_HELP)
+    propose_parser.add_argument(
+        "--timeout", type=float, default=None, help=_TIMEOUT_HELP
     )
     propose_parser.add_argument(
         "--yes",
@@ -506,7 +546,12 @@ def build_parser() -> argparse.ArgumentParser:
         help=method_help,
     )
     names_parser.add_argument("--threshold", type=float, default=0.85, help="Match threshold.")
-    names_parser.add_argument("--model", "-m", default=None, help="OpenRouter model string.")
+    names_parser.add_argument("--model", "-m", default=None, help=_MODEL_HELP)
+    names_parser.add_argument(
+        "--provider", "-p", default=DEFAULT_PROVIDER, choices=list(PROVIDERS), help=_PROVIDER_HELP
+    )
+    names_parser.add_argument("--base-url", dest="base_url", default=None, help=_BASE_URL_HELP)
+    names_parser.add_argument("--timeout", type=float, default=None, help=_TIMEOUT_HELP)
     names_parser.add_argument(
         "--json", action="store_true", dest="json_output", help="Print raw JSON."
     )

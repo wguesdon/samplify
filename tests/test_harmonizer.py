@@ -6,6 +6,7 @@ Run them with: pytest -m live
 """
 
 import json
+import urllib.error
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -13,6 +14,9 @@ from samplify import rules
 from samplify.harmonizer import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
+    DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OLLAMA_TIMEOUT,
+    OLLAMA_BASE_URL,
     _build_user_message,
     build_system_prompt,
     harmonize,
@@ -109,6 +113,17 @@ def test_resolve_model_falls_back_to_the_default(monkeypatch):
     assert resolve_model(None) == DEFAULT_MODEL
 
 
+def test_resolve_model_falls_back_to_the_ollama_default(monkeypatch):
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    assert resolve_model(None, provider="ollama") == DEFAULT_OLLAMA_MODEL
+
+
+def test_resolve_model_reads_the_ollama_environment(monkeypatch):
+    monkeypatch.setenv("OLLAMA_MODEL", "local/model")
+    monkeypatch.setenv("OPENROUTER_MODEL", "hosted/model")
+    assert resolve_model(None, provider="ollama") == "local/model"
+
+
 def test_the_request_goes_to_openrouter_with_the_chosen_model():
     _result, client_cls = _answer(
         json.dumps({"mapping": {"sample1": "sample1"}}), model="acme/model-1"
@@ -158,6 +173,143 @@ def test_the_system_prompt_carries_the_number_rule_and_the_shared_table():
     assert "p111" in prompt
     assert "p112" in prompt
     assert rules.prompt_rules() in prompt
+
+
+# ── The ollama provider (no server) ────────────────────────────────────────
+
+def _ollama(answer, capabilities=("thinking",), names=None, **kwargs):
+    """Run harmonize against a fake ollama server.
+
+    Args:
+        answer: The message content the fake server returns.
+        capabilities: What /api/show reports for the model.
+        names: The input names. Defaults to two names.
+        **kwargs: Passed through to harmonize.
+
+    Returns:
+        A tuple of the result and the list of requests, each one a tuple of the
+        URL, the payload and the timeout.
+    """
+    calls = []
+
+    def _fake_post(url, payload, timeout):
+        calls.append((url, payload, timeout))
+        if url.endswith("/api/show"):
+            return {"capabilities": list(capabilities)}
+        return {"message": {"content": answer}}
+
+    with patch("samplify.harmonizer._post_json", side_effect=_fake_post):
+        result = harmonize(
+            names if names is not None else ["sample1", "sample2"],
+            provider="ollama",
+            **kwargs,
+        )
+    return result, calls
+
+
+def _chat_call(calls):
+    """Return the request that went to /api/chat."""
+    return next(call for call in calls if call[0].endswith("/api/chat"))
+
+
+def test_ollama_needs_no_api_key(monkeypatch):
+    """A local model is the answer for a machine with no key."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    result, _calls = _ollama(answer)
+
+    assert result["mapping"]["sample1"] == "sample1"
+
+
+def test_ollama_posts_to_the_native_chat_endpoint():
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    _result, calls = _ollama(answer)
+
+    url, payload, _timeout = _chat_call(calls)
+    assert url == f"{OLLAMA_BASE_URL}/api/chat"
+    assert payload["model"] == DEFAULT_OLLAMA_MODEL
+    assert payload["stream"] is False
+    assert payload["format"] == "json"
+    assert payload["options"]["temperature"] == 0
+
+
+def test_ollama_turns_the_thinking_block_off():
+    """A think block costs minutes on a CPU, and the answer never needs it."""
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    _result, calls = _ollama(answer, capabilities=("completion", "thinking"))
+
+    assert _chat_call(calls)[1]["think"] is False
+
+
+def test_ollama_omits_think_for_a_model_without_it():
+    """The field is not valid for a model that cannot think."""
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    _result, calls = _ollama(answer, capabilities=("completion",))
+
+    assert "think" not in _chat_call(calls)[1]
+
+
+def test_ollama_reads_the_host_from_the_environment(monkeypatch):
+    monkeypatch.setenv("OLLAMA_HOST", "workstation:11434")
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    _result, calls = _ollama(answer)
+
+    assert _chat_call(calls)[0] == "http://workstation:11434/api/chat"
+
+
+def test_ollama_takes_an_explicit_base_url(monkeypatch):
+    monkeypatch.setenv("OLLAMA_HOST", "workstation:11434")
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    _result, calls = _ollama(answer, base_url="http://box:1234/")
+
+    assert _chat_call(calls)[0] == "http://box:1234/api/chat"
+
+
+def test_ollama_restores_a_name_the_model_dropped():
+    answer = json.dumps({"mapping": {"sample1": "sample_1"}})
+
+    result, _calls = _ollama(answer)
+
+    assert result["mapping"]["sample2"] == "sample2"
+
+
+def test_ollama_uses_its_own_timeout():
+    answer = json.dumps({"mapping": {"sample1": "sample1", "sample2": "sample2"}})
+
+    _result, calls = _ollama(answer)
+
+    assert _chat_call(calls)[2] == DEFAULT_OLLAMA_TIMEOUT
+
+
+def test_ollama_reports_a_server_that_is_not_running():
+    def _refused(*args, **kwargs):
+        raise urllib.error.URLError("Connection refused")
+
+    with patch("samplify.harmonizer.urllib.request.urlopen", side_effect=_refused):
+        with pytest.raises(ValueError, match="No usable answer from ollama"):
+            harmonize(["sample1"], provider="ollama")
+
+
+def test_ollama_reports_an_answer_without_a_message():
+    def _fake_post(url, payload, timeout):
+        if url.endswith("/api/show"):
+            return {"capabilities": []}
+        return {"error": "model not found"}
+
+    with patch("samplify.harmonizer._post_json", side_effect=_fake_post):
+        with pytest.raises(ValueError, match="without a message"):
+            harmonize(["sample1"], provider="ollama")
+
+
+def test_an_unknown_provider_raises():
+    with pytest.raises(ValueError, match="Unknown provider"):
+        harmonize(["sample1"], provider="anthropic")
 
 
 # ── Live tests (require real API key) ──────────────────────────────────────

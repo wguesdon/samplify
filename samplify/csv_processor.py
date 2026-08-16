@@ -19,7 +19,7 @@ from typing import Any
 import pandas as pd
 
 from . import matching, rules
-from .harmonizer import harmonize, resolve_model
+from .harmonizer import DEFAULT_PROVIDER, harmonize, resolve_model
 from .mapping import Group, MappingFile
 
 
@@ -159,6 +159,9 @@ def propose(
     occurrences: dict[str, int] | None = None,
     api_key: str | None = None,
     model: str | None = None,
+    provider: str = DEFAULT_PROVIDER,
+    base_url: str | None = None,
+    timeout: float | None = None,
 ) -> MappingFile:
     """Cluster sample names and propose a canonical name for each cluster.
 
@@ -173,7 +176,11 @@ def propose(
             distance backends.
         occurrences: How many rows carry each name.
         api_key: OpenRouter API key, for the backends that call a model.
-        model: OpenRouter model string.
+        model: The model string.
+        provider: ``"openrouter"`` or ``"ollama"``, for the backends that call a
+            model.
+        base_url: The server to call, for the backends that call a model.
+        timeout: Seconds to wait for the answer.
 
     Returns:
         A mapping file with every group still marked ``proposed``.
@@ -190,6 +197,7 @@ def propose(
     near_misses = [list(pair) for pair in matching.find_near_misses(unique)]
     canonical_pattern = ""
     used_model: str | None = None
+    used_provider: str | None = None
 
     if not unique:
         return MappingFile(groups=[], method=method, diagnosis=findings)
@@ -201,9 +209,17 @@ def propose(
         groups = _build_groups(clusters, occurrences, method, corpus=corpus)
 
     elif method == "llm":
-        result = harmonize(unique, api_key=api_key, model=model)
+        result = harmonize(
+            unique,
+            api_key=api_key,
+            model=model,
+            provider=provider,
+            base_url=base_url,
+            timeout=timeout,
+        )
         canonical_pattern = result.get("canonical_pattern", "")
-        used_model = resolve_model(model)
+        used_model = resolve_model(model, provider=provider)
+        used_provider = provider
         clusters = _cluster_by_canonical(unique, result["mapping"])
         groups = _build_groups(clusters, occurrences, method, canonical=result["mapping"])
 
@@ -221,10 +237,16 @@ def propose(
             ]
             rep_to_cluster = dict(zip(representatives, offline))
             result = harmonize(
-                sorted(rep_to_cluster), api_key=api_key, model=model
+                sorted(rep_to_cluster),
+                api_key=api_key,
+                model=model,
+                provider=provider,
+                base_url=base_url,
+                timeout=timeout,
             )
             canonical_pattern = result.get("canonical_pattern", "")
-            used_model = resolve_model(model)
+            used_model = resolve_model(model, provider=provider)
+            used_provider = provider
             clusters, canonical = _merge_clusters_by_model(rep_to_cluster, result["mapping"])
             groups = _build_groups(clusters, occurrences, "auto", canonical=canonical)
 
@@ -232,6 +254,7 @@ def propose(
         groups=groups,
         method=method,
         model=used_model,
+        provider=used_provider,
         diagnosis=findings,
         near_misses=near_misses,
         canonical_pattern=canonical_pattern,
@@ -309,6 +332,9 @@ def propose_csv(
     threshold: float = 0.85,
     api_key: str | None = None,
     model: str | None = None,
+    provider: str = DEFAULT_PROVIDER,
+    base_url: str | None = None,
+    timeout: float | None = None,
 ) -> MappingFile:
     """Read a CSV column and propose a mapping for the names in it.
 
@@ -318,7 +344,10 @@ def propose_csv(
         method: The backend, as in :func:`propose`.
         threshold: The similarity threshold for the distance backends.
         api_key: OpenRouter API key.
-        model: OpenRouter model string.
+        model: The model string.
+        provider: ``"openrouter"`` or ``"ollama"``.
+        base_url: The server to call.
+        timeout: Seconds to wait for the answer.
 
     Returns:
         A mapping file with every group still marked ``proposed``, carrying the
@@ -345,6 +374,9 @@ def propose_csv(
         occurrences=occurrences,
         api_key=api_key,
         model=model,
+        provider=provider,
+        base_url=base_url,
+        timeout=timeout,
     )
     result.input_file = str(path.resolve())
     result.column = column
@@ -493,6 +525,9 @@ def harmonize_csv(
     canonical_column: str | None = None,
     api_key: str | None = None,
     model: str | None = None,
+    provider: str = DEFAULT_PROVIDER,
+    base_url: str | None = None,
+    timeout: float | None = None,
     method: str = "auto",
     threshold: float = 0.85,
 ) -> tuple[pd.DataFrame, dict]:
@@ -511,7 +546,10 @@ def harmonize_csv(
         csv_log_path: Where to write the change table as CSV.
         canonical_column: The name of the new column.
         api_key: OpenRouter API key.
-        model: OpenRouter model string.
+        model: The model string.
+        provider: ``"openrouter"`` or ``"ollama"``.
+        base_url: The server to call.
+        timeout: Seconds to wait for the answer.
         method: The backend, as in :func:`propose`.
         threshold: The similarity threshold for the distance backends.
 
@@ -519,7 +557,15 @@ def harmonize_csv(
         A tuple of the DataFrame with the canonical column added, and the log.
     """
     mapping = propose_csv(
-        path, column, method=method, threshold=threshold, api_key=api_key, model=model
+        path,
+        column,
+        method=method,
+        threshold=threshold,
+        api_key=api_key,
+        model=model,
+        provider=provider,
+        base_url=base_url,
+        timeout=timeout,
     )
     mapping.accept_all()
     return apply_mapping(

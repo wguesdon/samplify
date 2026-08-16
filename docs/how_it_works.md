@@ -39,6 +39,8 @@ The mapping file is the file that a person reviews, that git stores and that
 {
   "schema_version": 1,
   "method": "damerau",
+  "model": null,
+  "provider": null,
   "reviewed": true,
   "near_misses": [["patient111_batch2", "patient11_batch2"]],
   "groups": [
@@ -136,7 +138,32 @@ model call when the offline pass finds no inconsistency and forms no cluster.
 
 samplify checks each proposal from the model. If the model gives one canonical
 name to two representatives with different numbers, samplify keeps the two names
-apart. The model advises, and the identity rule decides.
+apart. Each of the two then keeps its own canonical name. The model advises, and
+the identity rule decides.
+
+### The two providers
+
+Two services answer the request of the `llm` and `auto` backends.
+
+| Provider | Server | Key | Default model |
+|---|---|---|---|
+| `openrouter` | The OpenRouter API | `OPENROUTER_API_KEY` | `openai/gpt-4o-mini` |
+| `ollama` | `http://localhost:11434` | None | `qwen3.5:9b` |
+
+The option `--provider ollama` runs the model on the local machine, so the names
+never leave it. `OLLAMA_HOST` and `--base-url` point at another machine, and
+`OLLAMA_MODEL` and `--model` choose the model.
+
+samplify calls the native ollama endpoint rather than the OpenAI-compatible one,
+because only the native endpoint takes `format` and `think`. A model with the
+thinking capability writes a long reasoning block before the answer. On a CPU
+that block is the whole cost. One request with the block did not finish in 280
+seconds, and the same request with `think: false` finished in 9 seconds.
+samplify reads the capabilities of the model first, because the field is not
+valid for a model that cannot think.
+
+The mapping file records the provider next to the model, so a person reading the
+file sees which service produced the proposal.
 
 ## The identity rule
 
@@ -279,16 +306,22 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest -m "not live"   # 131 unit tests, no API key
-./tests/smoke_test.sh         # the command line end to end, no API key
-uv run pytest -m live         # the model-backed paths, needs a key
+uv run pytest                 # 160 offline tests, no key and no server
+./tests/smoke_test.sh         # the command line end to end, no key
+uv run pytest -m local        # the local model, needs a running ollama
+uv run pytest -m live         # the hosted model, needs an OpenRouter key
 ```
 
-The offline tests cover every backend except `llm`. They also cover the guards,
-the near-miss rule, the figure and the reproducibility claim. The file
-`example/mislabel_catalogue.csv` holds its own answer in a `true_sample` column.
-One test reads that column and checks that the 24 written names resolve to the 14
-real samples, so no person reads the output. The live tests cover the model call.
+The offline tests cover every backend, the guards, the near-miss rule, the figure
+and the reproducibility claim. The model itself is replaced, so they also cover
+the request that goes to each provider and the answers that must raise an error.
+The file `example/mislabel_catalogue.csv` holds its own answer in a `true_sample`
+column. One test reads that column and checks that the 24 written names resolve
+to the 14 real samples, so no person reads the output.
+
+The `local` tests run the whole workflow against a real ollama server. They check
+what samplify guarantees and not what the model prefers. One of them asserts that
+no group mixes two different samples of the catalogue.
 
 ## Design rules
 
@@ -296,6 +329,8 @@ real samples, so no person reads the output. The live tests cover the model call
   identifies it. samplify merges no name across two different identifiers.
 - The model proposes and a person decides. The `--yes` option is allowed, and it
   records `"reviewed": false`.
+- The names stay on the machine when the provider is `ollama`. The mapping file
+  records which provider answered.
 - The `apply` command never calls a model.
 - samplify never overwrites the original column, and it writes the canonical name
   in a new column.

@@ -456,6 +456,29 @@ def test_auto_sends_one_name_for_each_offline_cluster():
     assert len(mapping.groups) == 8
 
 
+def test_the_mapping_file_records_the_provider_and_the_model(tmp_path):
+    """A person reading the file must see which service answered."""
+    csv_path = tmp_path / "names.csv"
+    csv_path.write_text("sample_id,value\nS1_B1,1\ns1-b1,2\n")
+    answer = {"canonical_pattern": "", "mapping": {"S1_B1": "s1_b1", "s1-b1": "s1_b1"}}
+
+    with patch("samplify.csv_processor.harmonize", return_value=answer) as fake:
+        mapping = propose_csv(
+            csv_path, "sample_id", method="llm", provider="ollama", model="qwen3.5:9b"
+        )
+
+    assert fake.call_args.kwargs["provider"] == "ollama"
+    assert mapping.provider == "ollama"
+    assert mapping.model == "qwen3.5:9b"
+    assert mapping.to_dict()["provider"] == "ollama"
+
+
+def test_an_offline_method_records_no_provider():
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau")
+    assert mapping.provider is None
+    assert mapping.model is None
+
+
 def test_auto_refuses_a_model_merge_across_two_numbers(tmp_path):
     """The identity rule outranks the model, and the refused half keeps its name.
 

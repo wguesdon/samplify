@@ -1,6 +1,6 @@
 [project]
 name = "samplify"
-version = "0.2.1"
+version = "0.3.0"
 description = "Find sample names that are the same sample spelled differently, and let a person confirm each group before anything is renamed"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -45,4 +45,9 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-markers = ["live: requires a real OpenRouter API key (deselect with -m 'not live')"]
+markers = [
+    "live: requires a real OpenRouter API key (run with -m live)",
+    "local: requires a running ollama server (run with -m local)",
+]
+# The default run is the offline suite. A -m on the command line replaces this.
+addopts = "-m 'not live and not local'"

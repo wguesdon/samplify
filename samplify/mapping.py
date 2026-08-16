@@ -156,6 +156,8 @@ class MappingFile:
         input_file: The CSV the names came from, as an absolute path.
         column: The column the names came from.
         model: The model string, when a model was called.
+        provider: The service that answered, when a model was called. It is
+            ``"openrouter"`` or ``"ollama"``.
         reviewed: True only when a person made the decisions.
         reviewed_at: When the review finished.
         created: When the file was written.
@@ -170,6 +172,7 @@ class MappingFile:
     input_file: str | None = None
     column: str | None = None
     model: str | None = None
+    provider: str | None = None
     reviewed: bool = False
     reviewed_at: str | None = None
     created: str = field(default_factory=_now)
@@ -266,6 +269,7 @@ class MappingFile:
             "column": self.column,
             "method": self.method,
             "model": self.model,
+            "provider": self.provider,
             "canonical_pattern": self.canonical_pattern,
             "reviewed": self.reviewed,
             "reviewed_at": self.reviewed_at,
@@ -316,6 +320,7 @@ class MappingFile:
             input_file=data.get("input_file"),
             column=data.get("column"),
             model=data.get("model"),
+            provider=data.get("provider"),
             reviewed=bool(data.get("reviewed", False)),
             reviewed_at=data.get("reviewed_at"),
             created=str(data.get("created", _now())),

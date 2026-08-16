@@ -9,6 +9,33 @@ command surface or a change that alters which names group together. Those bump
 the major version. A new backend or a new command bumps the minor version. A fix
 that leaves the grouping unchanged bumps the patch version.
 
+## [0.3.0] - 2026-08-16
+
+### Added
+
+- A local model, through [ollama](https://ollama.com). The option
+  `--provider ollama` on `samplify propose` and on `samplify names` sends the
+  request to a model on the machine. It needs no API key, and the sample names
+  never leave the machine. `--base-url` and `OLLAMA_HOST` point at another
+  machine. `--model` and `OLLAMA_MODEL` choose the model, and the default is
+  `qwen3.5:9b`.
+- The option `--timeout` on the same two commands. A local model on a CPU is
+  slower than a hosted one, and the default for ollama is 300 seconds.
+- The field `provider` in the mapping file, next to `model`. A file written by
+  an offline backend records `null` for both fields.
+- Tests for the local path. The offline tests replace the server and check the
+  request, and `uv run pytest -m local` runs the whole workflow against a real
+  ollama server.
+
+### Changed
+
+- samplify calls the native ollama endpoint and not the OpenAI-compatible one,
+  because only the native endpoint takes `format` and `think`. A thinking model
+  answered the same request in 9 seconds with the block turned off. With the
+  block on it did not answer in 280 seconds.
+- The default `uv run pytest` now runs the offline suite alone. The hosted model
+  needs `-m live` and the local model needs `-m local`.
+
 ## [0.2.1] - 2026-08-16
 
 ### Fixed

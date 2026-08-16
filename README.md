@@ -22,7 +22,8 @@ cause.
 samplify never merges two names with different numbers, because the numbers
 identify the sample. Six backends form the groups, and four of them make no
 network call. The default backend is `auto`, and it calls a model only when the
-offline pass finds an inconsistency or forms a cluster.
+offline pass finds an inconsistency or forms a cluster. That model is a hosted
+one through OpenRouter, or a local one through ollama.
 
 ## Install
 
@@ -37,12 +38,20 @@ install the `plot` extra. The extra adds matplotlib.
 uv add "samplify[plot]"
 ```
 
-The `llm` and `auto` backends need an [OpenRouter](https://openrouter.ai) key in
-a `.env` file.
+The `llm` and `auto` backends need a model, and two services answer. The first
+is [OpenRouter](https://openrouter.ai), which reads its key from a `.env` file.
 
 ```env
 OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=openai/gpt-4o-mini
+```
+
+The second is [ollama](https://ollama.com), which runs a model on your own
+machine. It needs no key, and the sample names never leave the machine.
+
+```bash
+ollama pull qwen3.5:9b
+uv run samplify propose data.csv -c sample_id -M auto --provider ollama
 ```
 
 ## Example
