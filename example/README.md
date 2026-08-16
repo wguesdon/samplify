@@ -1,70 +1,73 @@
 # Example data and test cases
 
-These six files are the worked examples in the README and the inputs that
+These six files are the worked examples for samplify and the inputs that
 `tests/smoke_test.sh` runs. Each file isolates one failure mode, so you can see
-which backend finds it and which backend cannot. Every command below runs
+which backend finds it and which backend does not. Every command below runs
 offline and needs no API key.
 
 ## `clean_samples.csv`, the file that needs no work
 
-Three samples, two timepoints, one naming convention. The heuristics find no
-inconsistency and no cluster forms, so the `auto` backend skips the model call
-completely.
+The file holds three samples, two timepoints and one name convention. The offline
+pass finds no inconsistency and forms no cluster, so the `auto` backend makes no
+model call.
 
 ```bash
 uv run samplify propose example/clean_samples.csv -c sample_id -M auto -o /tmp/clean.json
 ```
 
-Expect 3 groups, all unchanged, and `"model": null` in the mapping file.
+The result is 3 groups. samplify changes no name, and the mapping file records
+`"model": null`.
 
 ## `delimiter_case.csv`, the character-level problem
 
 The same sample appears as `S1_B1`, as `s1-b1` and as `s01_b01`. The delimiter,
-the case and the zero-padding all differ. The `rules` backend fixes this on its
-own, because the three names normalise to one string.
+the letter case and the zero-padding all differ. The `rules` backend repairs the
+three names alone, because they normalise to one string.
 
 ```bash
 uv run samplify propose example/delimiter_case.csv -c sample_id -M rules -o /tmp/delim.json
 ```
 
-Expect one merge of three names into `sample1_batch1`, and two renames.
+The result is 3 groups. samplify merges three names into `sample1_batch1`, and it
+changes two more names.
 
-## `typos.csv`, the problem the rules cannot see
+## `typos.csv`, the problem that the rules do not find
 
-`patietn1_batch1`, `pateint1_batch1` and `patient1_bacth1` are three typing
-errors on `patient1_batch1`. No normalisation rule joins them, because the
-characters themselves are wrong. A distance backend joins them.
+The names `patietn1_batch1`, `pateint1_batch1` and `patient1_bacth1` are three
+typing errors of `patient1_batch1`. No normalisation rule groups them, because
+the characters are wrong. A distance backend groups them.
 
 ```bash
 uv run samplify propose example/typos.csv -c sample_id -M rules -o /tmp/t1.json      # 5 groups
 uv run samplify propose example/typos.csv -c sample_id -M damerau -o /tmp/t2.json    # 2 groups
 ```
 
-The correct spelling wins the group. Every one of the four names appears once, so
-frequency cannot decide it. The winner is the name closest to all the others,
-and each typo sits one edit from the correct form and two edits from the other
-typos.
+samplify selects the correct spelling as the canonical name. Each of the four
+names appears one time, so the frequency decides nothing. The canonical name is
+the name closest to all the other names. Each typing error is one edit from the
+correct form and two edits from the other errors.
 
-## `near_miss_trap.csv`, the merge that must not happen
+## `near_miss_trap.csv`, the names that must stay apart
 
-`patient11_batch1`, `patient111_batch1` and `patient112_batch1` are three
-patients. Their letters are identical and their names are one or two characters
-apart, so any distance measure that ignores the numbers will merge them.
+The names `patient11_batch1`, `patient111_batch1` and `patient112_batch1` are
+three patients. Their letters are identical, and their names differ by one or two
+characters. A distance measure that ignores the numbers merges them.
 
 ```bash
 uv run samplify propose example/near_miss_trap.csv -c sample_id -M damerau -o /tmp/trap.json
 ```
 
-Expect no merge at all, and two reported near misses. `patient11` against
-`patient111` is a gained digit and is reported. `patient111` against
-`patient112` is a substituted digit and is not reported, because two consecutive
-patient numbers differ that way as a matter of course.
+samplify merges no name, and it reports two near misses. The pair `patient11` and
+`patient111` has one more digit, so samplify reports it. The pair `patient111`
+and `patient112` has a substituted digit, so samplify does not report it. Two
+consecutive patient numbers usually differ in that way.
 
-## `cohort_messy.csv`, all of it at once
+## `cohort_messy.csv`, all the faults in one file
 
-Twenty-two rows from three sites. It contains the delimiter and case variants,
-two typos, the abbreviations `ctrl`, `ko`, `wt`, `rep` and `b`, and one near-miss
-pair. This is the file to use when you try the full three-step workflow.
+The file holds twenty-two rows from three sites. It contains the delimiter
+variants and the letter case variants. It also contains two typing errors, the
+abbreviations `ctrl`, `ko`, `wt`, `rep` and `b`, and one near-miss pair. Use this
+file for the full three-step workflow.
 
 ```bash
 uv run samplify propose example/cohort_messy.csv -c sample_id -M damerau -o /tmp/cohort.json
@@ -72,23 +75,24 @@ uv run samplify review /tmp/cohort.json
 uv run samplify apply /tmp/cohort.json -o /tmp/clean.csv --csv-log /tmp/changes.csv
 ```
 
-Expect 8 groups, of which 6 are merges, and one near-miss pair. The offline pass
-resolves the whole file, so the model is never called. Run the same file with
-`-M auto` and a key in `.env` to compare the two paths.
+The result is 8 groups, and 6 of the groups merge two or more names. samplify
+also reports one near-miss pair. The offline pass resolves the whole file, so
+samplify makes no model call. To compare the two paths, run the same file with
+`-M auto` and a key in `.env`.
 
 ## `mislabel_catalogue.csv`, one row per fault
 
-This file is the reference set. Each row names the fault it carries, and the
-`true_sample` column records which sample the name really belongs to, so a test
-can check the answer rather than a person reading the output.
+This file is the reference set. Each row names its own fault, and the
+`true_sample` column records the correct sample for that name. A test therefore
+checks the answer, and no person reads the output.
 
 ```bash
 uv run samplify propose example/mislabel_catalogue.csv -c sample_id -M damerau \
   -o /tmp/cat.json --plot /tmp/cat_qc.png
 ```
 
-Twenty-four written names cover fourteen real samples. Ten faults must be
-caught, and three pairs must stay apart.
+Twenty-four written names cover fourteen real samples. samplify must find ten
+faults, and it must keep three pairs apart.
 
 | Fault | Reference | As written | Caught by |
 |---|---|---|---|
@@ -109,4 +113,5 @@ caught, and three pairs must stay apart.
 | `sample_11` and `sample_12` | Two samples. |
 | `sample_10` and `sample_100` | Two samples, and the only pair reported for a person to check. |
 
-The QC figure for this file is in `docs/img/qc_mislabel_catalogue.png`.
+The quality control figure for this file is in
+`docs/img/qc_mislabel_catalogue.png`.
