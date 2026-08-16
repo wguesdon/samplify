@@ -1,11 +1,12 @@
-"""
-Command-line interface for samplify.
+"""Command-line interface for samplify.
 
-Usage examples:
+Four commands. The first proposes, the second lets a person decide, the third
+applies the decisions, and the fourth is a quick look that writes nothing.
+
+    samplify propose data.csv --column sample_id -o mapping.json
+    samplify review mapping.json
+    samplify apply mapping.json --output clean.csv
     samplify names "sample_1_batch_1" "sample1_batch2" "sample-1-b3"
-    samplify names --file names.txt
-    samplify csv data.csv --column sample_id
-    samplify csv data.csv --column sample_id --output out.csv --json-log log.json
 """
 
 from __future__ import annotations
@@ -13,199 +14,517 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.table import Table
 
+from . import mapping as mapping_module
+from . import matching
+from .csv_processor import apply_mapping, propose_csv
 from .harmonizer import harmonize
+from .mapping import (
+    STATUS_ACCEPTED,
+    STATUS_EDITED,
+    STATUS_REJECTED,
+    Group,
+    MappingFile,
+)
 
 console = Console()
 
 
-# ── "names" subcommand (original behaviour) ───────────────────────────────
+# ── Rendering ──────────────────────────────────────────────────────────────
 
 
-def _run_names(args: argparse.Namespace) -> int:
-    names: list[str] = list(args.names)
-    if args.file:
-        try:
-            with open(args.file) as fh:
-                file_names = [line.strip() for line in fh if line.strip()]
-            names.extend(file_names)
-        except FileNotFoundError:
-            console.print(f"[red]Error:[/red] File not found: {args.file}")
-            return 1
+def _print_diagnosis(findings: dict) -> None:
+    """Print the heuristic findings from the propose step."""
+    verdict = findings.get("verdict", "unknown")
+    colour = "red" if verdict == "inconsistencies_found" else "green"
+    abbrevs = findings.get("abbreviations_detected") or []
+    lines = [
+        f"[bold {colour}]Verdict:[/bold {colour}] {verdict}",
+        f"  Delimiter mix:          {findings.get('delimiter_mix')}",
+        f"  Abbreviations detected: {', '.join(abbrevs) if abbrevs else 'none'}",
+        f"  Zero-padding mix:       {findings.get('zero_padding')}",
+        f"  Case mix:               {findings.get('case_mix')}",
+    ]
+    console.print(Panel("\n".join(lines), title="[bold]Diagnosis[/bold]", expand=False))
 
-    if not names:
-        console.print("[yellow]No sample names provided. Use --help for usage.[/yellow]")
-        return 1
 
-    console.print(f"[dim]Harmonizing {len(names)} sample names...[/dim]")
+def _print_near_misses(pairs: list[list[str]]) -> None:
+    """Print the pairs that read alike but carry different numbers."""
+    if not pairs:
+        return
+    table = Table(
+        show_header=True,
+        header_style="bold red",
+        title="Similar names with different numbers, never merged automatically",
+    )
+    table.add_column("Name A", style="yellow")
+    table.add_column("Name B", style="yellow")
+    for left, right in pairs:
+        table.add_row(left, right)
+    console.print(table)
+    console.print(
+        "[dim]Check each pair. Two patients, or one patient and a typed digit, "
+        "look identical to the tool.[/dim]\n"
+    )
+
+
+def _print_groups(groups: list[Group], title: str) -> None:
+    """Print a table of groups."""
+    if not groups:
+        return
+    table = Table(show_header=True, header_style="bold cyan", title=title)
+    table.add_column("#", justify="right")
+    table.add_column("Members", style="yellow")
+    table.add_column("Canonical", style="green")
+    table.add_column("Rows", justify="right")
+    table.add_column("Status")
+    for group in groups:
+        table.add_row(
+            str(group.id),
+            "\n".join(f"{m}  ({group.occurrences.get(m, 0)})" for m in group.members),
+            group.final,
+            str(group.rows),
+            group.status,
+        )
+    console.print(table)
+
+
+def _print_summary(mapping: MappingFile) -> None:
+    """Print the group counts."""
+    summary = mapping.summary()
+    console.print(
+        f"\n[bold]{summary['groups']}[/bold] groups: "
+        f"[bold green]{summary['merges']}[/bold green] merge, "
+        f"[bold]{summary['renames']}[/bold] rename, "
+        f"[bold]{summary['unchanged']}[/bold] unchanged, "
+        f"[bold red]{summary['near_misses']}[/bold red] near miss."
+    )
+
+
+# ── propose ────────────────────────────────────────────────────────────────
+
+
+def _run_propose(args: argparse.Namespace) -> int:
+    """Cluster the names in a CSV column and write a mapping file."""
+    output = Path(args.output) if args.output else Path(f"{Path(args.file).stem}_mapping.json")
 
     try:
-        result = harmonize(names, model=args.model)
-    except ValueError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        return 1
-
-    if args.output:
-        with open(args.output, "w") as fh:
-            json.dump(result, fh, indent=2)
-        console.print(f"[green]Mapping written to {args.output}[/green]")
-    elif args.json_output:
-        print(json.dumps(result, indent=2))
-    else:
-        console.print(f"\n[bold]Inferred pattern:[/bold] {result['canonical_pattern']}\n")
-        table = Table(show_header=True, header_style="bold cyan")
-        table.add_column("Original", style="yellow")
-        table.add_column("Canonical", style="green")
-        for original, canonical in result["mapping"].items():
-            changed = original != canonical
-            table.add_row(
-                original,
-                canonical,
-                *(["[bold]✓[/bold]"] if changed else [""]),
-            )
-        console.print(table)
-
-    return 0
-
-
-# ── "csv" subcommand ───────────────────────────────────────────────────────
-
-
-def _run_csv(args: argparse.Namespace) -> int:
-    from .csv_processor import harmonize_csv
-
-    canonical_column = args.canonical_column or f"{args.column}_canonical"
-
-    try:
-        _df, _log = harmonize_csv(
+        result = propose_csv(
             args.file,
             args.column,
-            output_path=args.output,
-            json_log_path=args.json_log,
-            csv_log_path=args.csv_log,
-            canonical_column=canonical_column,
+            method=args.method,
+            threshold=args.threshold,
             model=args.model,
         )
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"[red]Error:[/red] {exc}")
         return 1
 
+    _print_diagnosis(result.diagnosis)
+    _print_near_misses(result.near_misses)
+    _print_groups(result.merges(), "Candidate merges, these need a decision")
+    _print_groups(result.renames(), "Renames, one name each")
+    _print_summary(result)
+
+    if args.yes:
+        result.accept_all()
+        console.print(
+            "\n[yellow]--yes given, so every group is accepted and no person "
+            "reviewed them. The mapping file records reviewed: false.[/yellow]"
+        )
+
+    mapping_module.write(result, output)
+    console.print(f"[green]Mapping written to {output}[/green]")
+
+    if args.plot:
+        code = _write_plot(result, args.plot)
+        if code != 0:
+            return code
+
+    if not args.yes:
+        console.print(f"[dim]Next: samplify review {output}[/dim]")
+    return 0
+
+
+# ── plot ───────────────────────────────────────────────────────────────────
+
+
+def _write_plot(result: MappingFile, path: str, title: str | None = None, dpi: int = 150) -> int:
+    """Draw the quality control figure and save it.
+
+    Args:
+        result: The mapping to draw.
+        path: Where to save the figure.
+        title: An explicit title, or None for the default.
+        dpi: The resolution.
+
+    Returns:
+        The exit code.
+    """
+    try:
+        from .plots import qc_figure
+    except ImportError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        return 1
+
+    qc_figure(result, path=path, title=title, dpi=dpi)
+    console.print(f"[green]QC figure written to {path}[/green]")
+    return 0
+
+
+def _run_plot(args: argparse.Namespace) -> int:
+    """Draw the quality control figure for an existing mapping file."""
+    try:
+        result = mapping_module.read(args.mapping)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        return 1
+    return _write_plot(result, args.output, title=args.title, dpi=args.dpi)
+
+
+# ── review ─────────────────────────────────────────────────────────────────
+
+_REVIEW_HELP = (
+    "[bold]a[/bold] accept   "
+    "[bold]r[/bold] reject   "
+    "[bold]e[/bold] edit the canonical name   "
+    "[bold]A[/bold] accept all remaining   "
+    "[bold]q[/bold] save and quit"
+)
+
+
+def _review_group(group: Group, index: int, total: int) -> str:
+    """Ask a person what to do with one group.
+
+    Args:
+        group: The group awaiting a decision.
+        index: The position of this group in the review.
+        total: How many groups need a decision.
+
+    Returns:
+        The key the person pressed.
+    """
+    kind = "MERGE" if group.is_merge else "RENAME"
+    body = [f"[bold]{kind}[/bold]  group {group.id}  ({index} of {total})", ""]
+    for member in group.members:
+        body.append(f"  {member}   [dim]{group.occurrences.get(member, 0)} rows[/dim]")
+    body.append("")
+    body.append(f"  canonical: [green]{group.proposed}[/green]")
+    if group.min_similarity is not None:
+        body.append(f"  lowest similarity in the group: {group.min_similarity}")
+    console.print(Panel("\n".join(body), expand=False))
+    console.print(_REVIEW_HELP)
+    return Prompt.ask("Decision", choices=["a", "r", "e", "A", "q"], default="a")
+
+
+def _run_review(args: argparse.Namespace) -> int:
+    """Walk a person through every pending group and save the decisions."""
+    try:
+        result = mapping_module.read(args.mapping)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        return 1
+
+    pending = result.pending()
+    if not pending:
+        console.print("[green]Every group already has a decision.[/green]")
+        _print_summary(result)
+        return 0
+
+    if not sys.stdin.isatty():
+        console.print(
+            "[red]Error:[/red] review needs a terminal. For a pipeline, rerun "
+            "propose with --yes, which records that no person reviewed the mapping."
+        )
+        return 1
+
+    _print_near_misses(result.near_misses)
+
+    # Merges carry the risk, so they come first.
+    ordered = [g for g in pending if g.is_merge] + [g for g in pending if not g.is_merge]
+    total = len(ordered)
+
+    for index, group in enumerate(ordered, start=1):
+        answer = _review_group(group, index, total)
+
+        if answer == "a":
+            group.status = STATUS_ACCEPTED
+            group.final = group.proposed
+        elif answer == "r":
+            group.status = STATUS_REJECTED
+            group.final = group.proposed
+        elif answer == "e":
+            new_name = Prompt.ask("Canonical name", default=group.proposed)
+            group.final = new_name
+            group.status = STATUS_EDITED if new_name != group.proposed else STATUS_ACCEPTED
+        elif answer == "A":
+            for remaining in ordered[index - 1:]:
+                if remaining.status == mapping_module.STATUS_PROPOSED:
+                    remaining.status = STATUS_ACCEPTED
+                    remaining.final = remaining.proposed
+            break
+        elif answer == "q":
+            break
+
+    if not result.pending():
+        result.mark_reviewed()
+
+    collisions = result.collisions()
+    if collisions:
+        console.print(
+            f"[red]Warning:[/red] {len(collisions)} canonical name(s) come from "
+            f"more than one group: {', '.join(list(collisions)[:5])}."
+        )
+
+    mapping_module.write(result, args.mapping)
+    _print_summary(result)
+    console.print(f"[green]Decisions saved to {args.mapping}[/green]")
+    if result.pending():
+        console.print(
+            f"[yellow]{len(result.pending())} group(s) still have no decision. "
+            f"apply will refuse until they do.[/yellow]"
+        )
+    return 0
+
+
+# ── apply ──────────────────────────────────────────────────────────────────
+
+
+def _run_apply(args: argparse.Namespace) -> int:
+    """Apply a reviewed mapping to a CSV, with no model call."""
+    try:
+        result = mapping_module.read(args.mapping)
+        df, log = apply_mapping(
+            result,
+            data_path=args.data,
+            column=args.column,
+            output_path=args.output,
+            canonical_column=args.canonical_column,
+            json_log_path=args.json_log,
+            csv_log_path=args.csv_log,
+            mapping_path=str(args.mapping),
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        return 1
+
+    summary = log["summary"]
+    console.print(
+        f"[bold]{summary['total_rows']}[/bold] rows, "
+        f"[bold]{summary['unique_names']}[/bold] unique names, "
+        f"[bold green]{summary['names_changed']}[/bold green] changed."
+    )
+    if not log["reviewed"]:
+        console.print("[yellow]This mapping was not reviewed by a person.[/yellow]")
+    for label, path in (
+        ("Output CSV", args.output),
+        ("JSON log", args.json_log),
+        ("CSV log", args.csv_log),
+    ):
+        if path:
+            console.print(f"[green]{label} written to {path}[/green]")
+    if not args.output:
+        console.print("[dim]No --output given, so nothing was written.[/dim]")
+    return 0
+
+
+# ── names ──────────────────────────────────────────────────────────────────
+
+
+def _run_names(args: argparse.Namespace) -> int:
+    """Show what the backend proposes for a handful of names. Writes nothing."""
+    names: list[str] = list(args.names)
+    if args.file:
+        try:
+            with open(args.file) as fh:
+                names.extend(line.strip() for line in fh if line.strip())
+        except FileNotFoundError:
+            console.print(f"[red]Error:[/red] File not found: {args.file}")
+            return 1
+
+    if not names:
+        console.print("[yellow]No sample names given. Use --help for usage.[/yellow]")
+        return 1
+
+    try:
+        if args.method == "llm":
+            result = harmonize(names, model=args.model)
+            pairs = sorted(result["mapping"].items())
+            pattern = result.get("canonical_pattern", "")
+        else:
+            groups = matching.group_names(
+                names, method=args.method, threshold=args.threshold
+            )
+            pairs = sorted(
+                (member, matching.canonical_for_group(group))
+                for group in groups
+                for member in group
+            )
+            pattern = f"offline, method={args.method}"
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        return 1
+
+    if args.json_output:
+        print(json.dumps({"canonical_pattern": pattern, "mapping": dict(pairs)}, indent=2))
+        return 0
+
+    console.print(f"\n[bold]Inferred pattern:[/bold] {pattern}\n")
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Original", style="yellow")
+    table.add_column("Canonical", style="green")
+    table.add_column("Changed", justify="center")
+    for original, canonical in pairs:
+        table.add_row(original, canonical, "yes" if original != canonical else "")
+    console.print(table)
     return 0
 
 
 # ── Entry point ────────────────────────────────────────────────────────────
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for every command."""
     parser = argparse.ArgumentParser(
         prog="samplify",
-        description="Harmonize inconsistent bioinformatics sample names using an LLM.",
+        description=(
+            "Find sample names that are the same sample spelled differently, "
+            "and let a person confirm each group before anything is renamed."
+        ),
     )
-
+    parser.add_argument("--version", action="store_true", help="Print the version and exit.")
     subparsers = parser.add_subparsers(dest="command")
 
-    # ── names subcommand ──
-    names_parser = subparsers.add_parser(
-        "names",
-        help="Harmonize sample names given on the command line or from a text file.",
+    method_help = (
+        "rules: character rules only, no model. "
+        "hamming or levenshtein: add typo tolerance, no model. "
+        "llm: send every name to a model. "
+        "auto: cluster offline, then send one name per cluster to a model."
     )
-    names_parser.add_argument(
-        "names",
-        nargs="*",
-        metavar="NAME",
-        help="Sample names to harmonize (space-separated).",
+
+    propose_parser = subparsers.add_parser(
+        "propose", help="Cluster the names in a CSV column and write a mapping file."
     )
-    names_parser.add_argument(
-        "--file",
-        "-f",
-        metavar="PATH",
-        help="Text file with one sample name per line.",
+    propose_parser.add_argument("file", metavar="FILE", help="The input CSV file.")
+    propose_parser.add_argument(
+        "--column", "-c", required=True, help="Column holding the sample identifiers."
     )
-    names_parser.add_argument(
-        "--output",
-        "-o",
-        metavar="PATH",
-        help="Write JSON mapping to this file instead of stdout.",
+    propose_parser.add_argument(
+        "--output", "-o", default=None, help="Mapping file to write (default: <stem>_mapping.json)."
     )
-    names_parser.add_argument(
-        "--model",
-        "-m",
-        metavar="MODEL",
-        default=None,
-        help="OpenRouter model string (default: openai/gpt-4o-mini).",
+    propose_parser.add_argument(
+        "--method", "-M", default="auto", choices=list(matching.METHODS), help=method_help
     )
-    names_parser.add_argument(
-        "--json",
+    propose_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.85,
+        help="Lowest similarity that still counts as a match (default: 0.85).",
+    )
+    propose_parser.add_argument(
+        "--model", "-m", default=None, help="OpenRouter model string (default: openai/gpt-4o-mini)."
+    )
+    propose_parser.add_argument(
+        "--yes",
         action="store_true",
-        dest="json_output",
-        help="Print raw JSON output (useful for piping).",
+        help="Accept every group without a review. The file records reviewed: false.",
+    )
+    propose_parser.add_argument(
+        "--plot", default=None, metavar="PATH", help="Also write the QC figure here."
     )
 
-    # ── csv subcommand ──
-    csv_parser = subparsers.add_parser(
-        "csv",
-        help="Harmonize a sample-ID column in a CSV file.",
+    plot_parser = subparsers.add_parser(
+        "plot", help="Draw the quality control figure for a mapping file."
     )
-    csv_parser.add_argument(
-        "file",
-        metavar="FILE",
-        help="Path to the input CSV file.",
+    plot_parser.add_argument("mapping", metavar="MAPPING", help="The mapping file to draw.")
+    plot_parser.add_argument(
+        "--output", "-o", required=True, help="Where to write the figure, as .png or .pdf."
     )
-    csv_parser.add_argument(
-        "--column",
-        "-c",
-        metavar="COLUMN",
-        required=True,
-        help="Column name containing the sample identifiers.",
+    plot_parser.add_argument("--title", default=None, help="Figure title.")
+    plot_parser.add_argument("--dpi", type=int, default=150, help="Resolution (default: 150).")
+
+    review_parser = subparsers.add_parser(
+        "review", help="Decide each group in a mapping file. Needs a terminal."
     )
-    csv_parser.add_argument(
-        "--output",
-        "-o",
-        metavar="PATH",
-        default=None,
-        help="Path for the output CSV (input + canonical column).",
+    review_parser.add_argument("mapping", metavar="MAPPING", help="The mapping file to review.")
+
+    apply_parser = subparsers.add_parser(
+        "apply", help="Apply a reviewed mapping to a CSV. Never calls a model."
     )
-    csv_parser.add_argument(
-        "--json-log",
-        metavar="PATH",
-        default=None,
-        dest="json_log",
-        help="Path for the JSON summary log file.",
+    apply_parser.add_argument("mapping", metavar="MAPPING", help="The reviewed mapping file.")
+    apply_parser.add_argument(
+        "--data", default=None, help="The CSV to apply it to (default: the file in the mapping)."
     )
-    csv_parser.add_argument(
-        "--csv-log",
-        metavar="PATH",
-        default=None,
-        dest="csv_log",
-        help="Path for the CSV change log file.",
+    apply_parser.add_argument(
+        "--column", "-c", default=None, help="The column of names (default: the one in the mapping)."
     )
-    csv_parser.add_argument(
+    apply_parser.add_argument("--output", "-o", default=None, help="Where to write the result CSV.")
+    apply_parser.add_argument(
         "--canonical-column",
-        metavar="NAME",
-        default=None,
         dest="canonical_column",
-        help="Name of the new canonical column (default: {column}_canonical).",
-    )
-    csv_parser.add_argument(
-        "--model",
-        "-m",
-        metavar="MODEL",
         default=None,
-        help="OpenRouter model string (default: openai/gpt-4o-mini).",
+        help="Name of the new column (default: {column}_canonical).",
+    )
+    apply_parser.add_argument("--json-log", dest="json_log", default=None, help="JSON log path.")
+    apply_parser.add_argument("--csv-log", dest="csv_log", default=None, help="CSV log path.")
+
+    names_parser = subparsers.add_parser(
+        "names", help="Show what a backend proposes for names given directly. Writes nothing."
+    )
+    names_parser.add_argument("names", nargs="*", metavar="NAME", help="Sample names.")
+    names_parser.add_argument("--file", "-f", default=None, help="Text file, one name per line.")
+    names_parser.add_argument(
+        "--method",
+        "-M",
+        default=matching.DEFAULT_DISTANCE,
+        choices=list(matching.METHODS),
+        help=method_help,
+    )
+    names_parser.add_argument("--threshold", type=float, default=0.85, help="Match threshold.")
+    names_parser.add_argument("--model", "-m", default=None, help="OpenRouter model string.")
+    names_parser.add_argument(
+        "--json", action="store_true", dest="json_output", help="Print raw JSON."
     )
 
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the CLI.
+
+    Args:
+        argv: Arguments to parse. Defaults to ``sys.argv[1:]``.
+
+    Returns:
+        The process exit code.
+    """
+    parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "names":
-        return _run_names(args)
-    elif args.command == "csv":
-        return _run_csv(args)
-    else:
+    if getattr(args, "version", False):
+        from . import __version__
+
+        console.print(f"samplify {__version__}")
+        return 0
+
+    handlers = {
+        "propose": _run_propose,
+        "review": _run_review,
+        "apply": _run_apply,
+        "names": _run_names,
+        "plot": _run_plot,
+    }
+    handler = handlers.get(args.command)
+    if handler is None:
         parser.print_help()
         return 1
+    return handler(args)
 
 
 if __name__ == "__main__":

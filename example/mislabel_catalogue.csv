@@ -1,0 +1,25 @@
+sample_id,true_sample,pattern,value
+sample_1,sample1,reference spelling,10.1
+sample1,sample1,delimiter dropped,10.2
+sample-1,sample1,delimiter changed to a dash,10.3
+Sample_1,sample1,capital letter,10.4
+sample_2,sample2,reference spelling,20.1
+smple_2,sample2,one letter dropped,20.2
+sample_3,sample3,reference spelling,30.1
+sample_03,sample3,zero padded number,30.2
+sample_4,sample4,reference spelling,40.1
+SAMPLE_4,sample4,all capitals,40.2
+sample_5,sample5,reference spelling,50.1
+sampel_5,sample5,two letters swapped,50.2
+sample_6,sample6,reference spelling,60.1
+sample__6,sample6,doubled delimiter,60.2
+sample_7,sample7,reference spelling,70.1
+ sample_7 ,sample7,leading and trailing space,70.2
+sample_8,sample8,reference spelling,80.1
+s_8,sample8,abbreviated word,80.2
+sample_9a,sample9a,replicate a of sample 9,90.1
+sample_9b,sample9b,replicate b of sample 9,90.2
+sample_10,sample10,reference spelling,100.1
+sample_100,sample100,a different sample entirely,101.1
+sample_11,sample11,reference spelling,110.1
+sample_12,sample12,a different sample entirely,120.1

@@ -1,0 +1,7 @@
+sample_id,timepoint,value
+patient1_batch1,day0,10.4
+patient2_batch1,day0,11.9
+patient3_batch2,day0,9.7
+patient1_batch1,day7,12.2
+patient2_batch1,day7,13.4
+patient3_batch2,day7,10.1

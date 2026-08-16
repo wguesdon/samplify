@@ -1,0 +1,370 @@
+"""The mapping file: the artifact a person reviews and ``apply`` consumes.
+
+The file is organised around groups, not around single names, because the
+question a person answers is "are these three spellings one sample?". A group
+holds the members, the proposed canonical name and the decision.
+
+``apply`` reads this file and never calls a model, so the same mapping file and
+the same input give the same output on any machine and on any day.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+#: Bumped when the on-disk shape changes in a way an older reader cannot handle.
+SCHEMA_VERSION = 1
+
+STATUS_PROPOSED = "proposed"
+STATUS_ACCEPTED = "accepted"
+STATUS_REJECTED = "rejected"
+STATUS_EDITED = "edited"
+
+#: Every status a group may carry.
+STATUSES = (STATUS_PROPOSED, STATUS_ACCEPTED, STATUS_REJECTED, STATUS_EDITED)
+
+#: Statuses that mean the group's members take the canonical name.
+APPLIED_STATUSES = (STATUS_ACCEPTED, STATUS_EDITED)
+
+
+def _now() -> str:
+    """Return the current UTC time as an ISO 8601 string."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class Group:
+    """One candidate sample, with every spelling of it that was found.
+
+    Attributes:
+        id: A stable number used to refer to the group in the review step.
+        members: The raw names that the tool believes are one sample.
+        proposed: The canonical name the tool suggests.
+        final: The canonical name after review. Equal to ``proposed`` until a
+            person edits it.
+        status: One of :data:`STATUSES`.
+        occurrences: How many rows carry each member name.
+        method: The backend that formed this group.
+        min_similarity: The lowest pairwise similarity inside the group, or
+            None for a group of one and for a group the model formed.
+    """
+
+    id: int
+    members: list[str]
+    proposed: str
+    final: str
+    status: str = STATUS_PROPOSED
+    occurrences: dict[str, int] = field(default_factory=dict)
+    method: str = "rules"
+    min_similarity: float | None = None
+
+    @property
+    def is_merge(self) -> bool:
+        """True when the group joins more than one spelling into one sample."""
+        return len(self.members) > 1
+
+    @property
+    def is_rename(self) -> bool:
+        """True when one name changes but nothing merges."""
+        return len(self.members) == 1 and self.members[0] != self.proposed
+
+    @property
+    def is_noop(self) -> bool:
+        """True when the group changes nothing."""
+        return len(self.members) == 1 and self.members[0] == self.proposed
+
+    @property
+    def rows(self) -> int:
+        """The number of data rows this group covers."""
+        return sum(self.occurrences.get(m, 0) for m in self.members)
+
+    def resolved(self) -> dict[str, str]:
+        """Return the name each member takes once the decision is applied.
+
+        Returns:
+            A dictionary from member name to final name. A rejected group
+            leaves every member unchanged.
+
+        Raises:
+            ValueError: If the group is still awaiting a decision.
+        """
+        if self.status == STATUS_PROPOSED:
+            raise ValueError(f"Group {self.id} is still proposed and has no decision.")
+        if self.status == STATUS_REJECTED:
+            return {member: member for member in self.members}
+        return {member: self.final for member in self.members}
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the group to plain JSON types."""
+        return {
+            "id": self.id,
+            "members": list(self.members),
+            "proposed": self.proposed,
+            "final": self.final,
+            "status": self.status,
+            "occurrences": dict(self.occurrences),
+            "method": self.method,
+            "min_similarity": self.min_similarity,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Group:
+        """Build a group from its serialised form.
+
+        Args:
+            data: One entry of the ``groups`` list.
+
+        Returns:
+            The group.
+
+        Raises:
+            ValueError: If a required key is missing or a value is not valid.
+        """
+        for key in ("id", "members", "proposed", "final", "status"):
+            if key not in data:
+                raise ValueError(f"Group is missing the required key {key!r}.")
+        if data["status"] not in STATUSES:
+            raise ValueError(
+                f"Group {data['id']} has status {data['status']!r}, "
+                f"which is not one of {STATUSES}."
+            )
+        if not data["members"]:
+            raise ValueError(f"Group {data['id']} has no members.")
+        return cls(
+            id=int(data["id"]),
+            members=list(data["members"]),
+            proposed=str(data["proposed"]),
+            final=str(data["final"]),
+            status=str(data["status"]),
+            occurrences=dict(data.get("occurrences", {})),
+            method=str(data.get("method", "rules")),
+            min_similarity=data.get("min_similarity"),
+        )
+
+
+@dataclass
+class MappingFile:
+    """The whole reviewed artifact.
+
+    Attributes:
+        groups: Every candidate sample.
+        method: The backend used to build the file.
+        input_file: The CSV the names came from, as an absolute path.
+        column: The column the names came from.
+        model: The model string, when a model was called.
+        reviewed: True only when a person made the decisions.
+        reviewed_at: When the review finished.
+        created: When the file was written.
+        diagnosis: The heuristic findings from the propose step.
+        near_misses: Pairs that read alike but carry different numbers. These
+            are never merged. They are reported so a person can check them.
+        canonical_pattern: The model's description of the format it inferred.
+    """
+
+    groups: list[Group]
+    method: str = "rules"
+    input_file: str | None = None
+    column: str | None = None
+    model: str | None = None
+    reviewed: bool = False
+    reviewed_at: str | None = None
+    created: str = field(default_factory=_now)
+    diagnosis: dict[str, Any] = field(default_factory=dict)
+    near_misses: list[list[str]] = field(default_factory=list)
+    canonical_pattern: str = ""
+    schema_version: int = SCHEMA_VERSION
+
+    # ── Queries ────────────────────────────────────────────────────────────
+
+    def pending(self) -> list[Group]:
+        """Return the groups that still await a decision."""
+        return [g for g in self.groups if g.status == STATUS_PROPOSED]
+
+    def merges(self) -> list[Group]:
+        """Return the groups that join more than one spelling."""
+        return [g for g in self.groups if g.is_merge]
+
+    def renames(self) -> list[Group]:
+        """Return the groups that change one name without merging."""
+        return [g for g in self.groups if g.is_rename]
+
+    def final_mapping(self) -> dict[str, str]:
+        """Return the name every original takes once the decisions are applied.
+
+        Returns:
+            A dictionary from every original name to its final name.
+
+        Raises:
+            ValueError: If any group is still awaiting a decision.
+        """
+        still_open = self.pending()
+        if still_open:
+            ids = ", ".join(str(g.id) for g in still_open[:5])
+            more = "" if len(still_open) <= 5 else f" and {len(still_open) - 5} more"
+            raise ValueError(
+                f"{len(still_open)} group(s) are still proposed: {ids}{more}. "
+                f"Run 'samplify review' first, or rerun propose with --yes."
+            )
+
+        result: dict[str, str] = {}
+        for group in self.groups:
+            result.update(group.resolved())
+        return result
+
+    def collisions(self) -> dict[str, list[int]]:
+        """Find canonical names that more than one group produces.
+
+        A merge inside one group is the purpose of the tool. Two separate
+        groups landing on one canonical name is not, and it silently joins two
+        samples that the tool itself considered distinct.
+
+        Returns:
+            A dictionary from the shared canonical name to the group ids that
+            produce it. Empty when there is no collision.
+        """
+        by_name: dict[str, list[int]] = {}
+        for group in self.groups:
+            if group.status == STATUS_REJECTED:
+                continue
+            by_name.setdefault(group.final, []).append(group.id)
+        return {name: ids for name, ids in sorted(by_name.items()) if len(ids) > 1}
+
+    def summary(self) -> dict[str, int]:
+        """Count the groups by kind, for the console and the log."""
+        return {
+            "groups": len(self.groups),
+            "merges": len(self.merges()),
+            "renames": len(self.renames()),
+            "unchanged": len([g for g in self.groups if g.is_noop]),
+            "pending": len(self.pending()),
+            "rejected": len([g for g in self.groups if g.status == STATUS_REJECTED]),
+            "near_misses": len(self.near_misses),
+        }
+
+    def accept_all(self) -> None:
+        """Accept every pending group without a person present.
+
+        ``reviewed`` stays False, so the file records that no person checked
+        the decisions.
+        """
+        for group in self.pending():
+            group.status = STATUS_ACCEPTED
+            group.final = group.proposed
+
+    # ── Serialisation ──────────────────────────────────────────────────────
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the mapping file to plain JSON types."""
+        return {
+            "schema_version": self.schema_version,
+            "created": self.created,
+            "input_file": self.input_file,
+            "column": self.column,
+            "method": self.method,
+            "model": self.model,
+            "canonical_pattern": self.canonical_pattern,
+            "reviewed": self.reviewed,
+            "reviewed_at": self.reviewed_at,
+            "diagnosis": self.diagnosis,
+            "near_misses": [list(pair) for pair in self.near_misses],
+            "summary": self.summary(),
+            "groups": [g.to_dict() for g in self.groups],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MappingFile:
+        """Build a mapping file from its serialised form.
+
+        Args:
+            data: The parsed JSON document.
+
+        Returns:
+            The mapping file.
+
+        Raises:
+            ValueError: If the schema version is unsupported, a required key is
+                missing, or a name appears in more than one group.
+        """
+        version = data.get("schema_version")
+        if version != SCHEMA_VERSION:
+            raise ValueError(
+                f"Mapping file schema version {version!r} is not supported. "
+                f"This build of samplify reads version {SCHEMA_VERSION}."
+            )
+        if "groups" not in data:
+            raise ValueError("Mapping file has no 'groups' key.")
+
+        groups = [Group.from_dict(g) for g in data["groups"]]
+
+        seen: dict[str, int] = {}
+        for group in groups:
+            for member in group.members:
+                if member in seen:
+                    raise ValueError(
+                        f"Name {member!r} appears in group {seen[member]} "
+                        f"and in group {group.id}. Every name belongs to one group."
+                    )
+                seen[member] = group.id
+
+        return cls(
+            groups=groups,
+            method=str(data.get("method", "rules")),
+            input_file=data.get("input_file"),
+            column=data.get("column"),
+            model=data.get("model"),
+            reviewed=bool(data.get("reviewed", False)),
+            reviewed_at=data.get("reviewed_at"),
+            created=str(data.get("created", _now())),
+            diagnosis=dict(data.get("diagnosis", {})),
+            near_misses=[list(p) for p in data.get("near_misses", [])],
+            canonical_pattern=str(data.get("canonical_pattern", "")),
+            schema_version=int(version),
+        )
+
+    def mark_reviewed(self) -> None:
+        """Record that a person made the decisions in this file."""
+        self.reviewed = True
+        self.reviewed_at = _now()
+
+
+def write(mapping: MappingFile, path: str | Path) -> Path:
+    """Write a mapping file to disk as indented JSON.
+
+    Args:
+        mapping: The mapping file to write.
+        path: Where to write it.
+
+    Returns:
+        The path written.
+    """
+    path = Path(path)
+    with open(path, "w") as fh:
+        json.dump(mapping.to_dict(), fh, indent=2)
+        fh.write("\n")
+    return path
+
+
+def read(path: str | Path) -> MappingFile:
+    """Read a mapping file from disk and validate it.
+
+    Args:
+        path: The file to read.
+
+    Returns:
+        The mapping file.
+
+    Raises:
+        FileNotFoundError: If the path does not exist.
+        ValueError: If the document is not valid JSON or fails validation.
+    """
+    path = Path(path)
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path} is not valid JSON: {exc}") from exc
+    return MappingFile.from_dict(data)

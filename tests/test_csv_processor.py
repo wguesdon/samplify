@@ -15,7 +15,9 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from samplify.csv_processor import diagnose, harmonize_csv
+from samplify import mapping as mapping_module
+from samplify.csv_processor import apply_mapping, diagnose, harmonize_csv, propose, propose_csv
+from samplify.mapping import MappingFile
 
 
 # ── Unit tests (no API) ────────────────────────────────────────────────────
@@ -245,3 +247,168 @@ def test_harmonize_csv_live(tmp_path):
     print("\nLive CSV harmonize result:")
     for _, row in log_df.iterrows():
         print(f"  {row['original']!r:30s} → {row['canonical']!r}  (changed={row['changed']})")
+
+
+# ── propose and apply, offline (no API key needed) ─────────────────────────
+
+EXAMPLE_DIR = Path(__file__).resolve().parent.parent / "example"
+
+
+def test_propose_csv_offline_groups_the_delimiter_variants():
+    mapping = propose_csv(EXAMPLE_DIR / "delimiter_case.csv", "sample_id", method="rules")
+    merges = mapping.merges()
+    assert len(merges) == 1
+    assert sorted(merges[0].members) == ["S1_B1", "s01_b01", "s1-b1"]
+    assert merges[0].proposed == "sample1_batch1"
+
+
+def test_propose_csv_offline_groups_the_typos():
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau")
+    merges = mapping.merges()
+    assert len(merges) == 1
+    assert merges[0].proposed == "patient1_batch1"
+    assert len(merges[0].members) == 4
+
+
+def test_propose_csv_never_merges_two_patient_numbers():
+    mapping = propose_csv(EXAMPLE_DIR / "near_miss_trap.csv", "sample_id", method="damerau")
+    assert mapping.merges() == []
+    assert len(mapping.near_misses) == 2
+
+
+def test_propose_csv_makes_no_model_call_on_a_clean_file():
+    """auto skips the model when the heuristics find nothing and nothing clusters."""
+    mapping = propose_csv(EXAMPLE_DIR / "clean_samples.csv", "sample_id", method="auto")
+    assert mapping.model is None
+    assert mapping.summary()["unchanged"] == 3
+
+
+def test_propose_csv_records_the_input_and_column():
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="rules")
+    assert mapping.column == "sample_id"
+    assert mapping.input_file.endswith("typos.csv")
+
+
+def test_propose_csv_counts_occurrences():
+    mapping = propose_csv(EXAMPLE_DIR / "near_miss_trap.csv", "sample_id", method="rules")
+    counts = {m: g.occurrences[m] for g in mapping.groups for m in g.members}
+    assert counts["patient11_batch1"] == 2
+    assert counts["patient112_batch1"] == 1
+
+
+def test_propose_rejects_an_unknown_method():
+    with pytest.raises(ValueError, match="Unknown method"):
+        propose(["a"], method="fuzzy")
+
+
+def test_apply_refuses_while_a_group_is_pending(tmp_path):
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau")
+    with pytest.raises(ValueError, match="still proposed"):
+        apply_mapping(mapping, output_path=tmp_path / "out.csv")
+
+
+def test_apply_refuses_an_unreviewed_collision(tmp_path):
+    """Two groups landing on one name is a silent merge, so it stops."""
+    mapping = propose_csv(EXAMPLE_DIR / "near_miss_trap.csv", "sample_id", method="rules")
+    mapping.accept_all()
+    for group in mapping.groups:
+        group.final = "one_name_for_everything"
+
+    with pytest.raises(ValueError, match="more than one group"):
+        apply_mapping(mapping, output_path=tmp_path / "out.csv")
+
+
+def test_apply_allows_a_collision_a_person_reviewed(tmp_path):
+    mapping = propose_csv(EXAMPLE_DIR / "near_miss_trap.csv", "sample_id", method="rules")
+    mapping.accept_all()
+    for group in mapping.groups:
+        group.final = "one_name_for_everything"
+    mapping.mark_reviewed()
+
+    df, _log = apply_mapping(mapping, output_path=tmp_path / "out.csv")
+    assert set(df["sample_id_canonical"]) == {"one_name_for_everything"}
+
+
+def test_apply_keeps_the_original_column(tmp_path):
+    mapping = propose_csv(EXAMPLE_DIR / "delimiter_case.csv", "sample_id", method="rules")
+    mapping.accept_all()
+    df, _log = apply_mapping(mapping, output_path=tmp_path / "out.csv")
+
+    assert "sample_id" in df.columns
+    assert df["sample_id"].tolist() == ["S1_B1", "s1-b1", "s01_b01", "S2_B1", "s2-b2"]
+    assert df["sample_id_canonical"].tolist() == [
+        "sample1_batch1",
+        "sample1_batch1",
+        "sample1_batch1",
+        "sample2_batch1",
+        "sample2_batch2",
+    ]
+
+
+def test_apply_honours_a_rejected_group(tmp_path):
+    mapping = propose_csv(EXAMPLE_DIR / "delimiter_case.csv", "sample_id", method="rules")
+    mapping.accept_all()
+    for group in mapping.merges():
+        group.status = "rejected"
+    mapping.mark_reviewed()
+
+    df, _log = apply_mapping(mapping, output_path=tmp_path / "out.csv")
+    assert df.loc[0, "sample_id_canonical"] == "S1_B1"
+
+
+def test_apply_is_deterministic(tmp_path):
+    """The claim the whole design rests on: no model call, same bytes every time."""
+    mapping = propose_csv(EXAMPLE_DIR / "cohort_messy.csv", "sample_id", method="damerau")
+    mapping.accept_all()
+
+    first = tmp_path / "first.csv"
+    second = tmp_path / "second.csv"
+    apply_mapping(mapping, output_path=first)
+    apply_mapping(mapping, output_path=second)
+
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_apply_reload_from_disk_is_deterministic(tmp_path):
+    mapping = propose_csv(EXAMPLE_DIR / "cohort_messy.csv", "sample_id", method="damerau")
+    mapping.accept_all()
+    path = mapping_module.write(mapping, tmp_path / "m.json")
+
+    first = tmp_path / "first.csv"
+    second = tmp_path / "second.csv"
+    apply_mapping(mapping, output_path=first)
+    apply_mapping(mapping_module.read(path), output_path=second)
+
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_apply_needs_a_column_when_the_mapping_records_none(tmp_path):
+    mapping = MappingFile(groups=[], input_file=str(EXAMPLE_DIR / "typos.csv"))
+    with pytest.raises(ValueError, match="No column given"):
+        apply_mapping(mapping, output_path=tmp_path / "out.csv")
+
+
+def test_catalogue_recovers_the_ground_truth():
+    """example/mislabel_catalogue.csv carries its own answer in the true_sample column."""
+    truth = pd.read_csv(EXAMPLE_DIR / "mislabel_catalogue.csv")
+    expected = dict(zip(truth["sample_id"], truth["true_sample"]))
+
+    mapping = propose_csv(EXAMPLE_DIR / "mislabel_catalogue.csv", "sample_id", method="damerau")
+
+    assert len(mapping.groups) == truth["true_sample"].nunique()
+    for group in mapping.groups:
+        truths = {expected[member] for member in group.members}
+        assert len(truths) == 1, f"group {group.id} mixes {truths}"
+
+
+def test_catalogue_reports_the_added_digit():
+    mapping = propose_csv(EXAMPLE_DIR / "mislabel_catalogue.csv", "sample_id", method="damerau")
+    assert mapping.near_misses == [["sample_10", "sample_100"]]
+
+
+def test_apply_log_records_that_nobody_reviewed(tmp_path):
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau")
+    mapping.accept_all()
+    _df, log = apply_mapping(mapping, output_path=tmp_path / "out.csv")
+    assert log["reviewed"] is False
+    assert log["method"] == "damerau"

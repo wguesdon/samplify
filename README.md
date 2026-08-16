@@ -1,108 +1,225 @@
 # samplify
 
-**LLM-powered harmonization of inconsistent bioinformatics sample names.**
-
-Stop your pipeline from breaking because one batch called it `sample_1_batch_1`
-and another called it `sample1-b2`.
+Find the sample names in your data that are one sample spelled several ways, and
+confirm each group before anything is renamed.
 
 ```
-sample_1_batch_1   ─┐
-sample1_batch2     ─┼─►  sample1_batch1
-sample-1-b3        ─┘    sample1_batch2
-                          sample1_batch3
+S1_B1            ─┐
+s1-b1            ─┤
+s01_b01          ─┼─►  patient1_batch1     you confirm this group
+patient1_batch1  ─┤
+patietn1_batch1  ─┘
+
+patient11_batch1  ──►  reported, never merged
+patient111_batch1 ──►  one of these is a slipped keystroke, or they are two patients
 ```
 
-`samplify` uses a large language model (via [OpenRouter](https://openrouter.ai))
-to infer the canonical naming pattern across your files and return a mapping
-table — no hand-rolled regex, no manual curation.
+Inconsistent sample identifiers break a join without an error message. The row
+count drops, the counts stop matching, and you lose an afternoon before you find
+the cause. samplify finds the candidate groups, shows you the evidence, and
+applies only the decisions that you make.
 
----
+## What it does
 
-## Why this exists
+samplify clusters the names in a CSV column and proposes one canonical name for
+each cluster. Four backends form the clusters, and three of them make no network
+call at all.
 
-Inconsistent sample IDs are one of the most common causes of silent failures in
-bioinformatics pipelines. The same sample appears as `ctrl_rep1_b1`,
-`control_replicate2_batch1`, and `ctrl-r3-batch1` across three collaborators'
-files. Regex fixes are brittle. Manual curation doesn't scale.
+| Backend | What it finds | Model call |
+|---|---|---|
+| `rules` | Delimiter, case, zero-padding and abbreviation differences | none |
+| `hamming` | The same, plus a substituted character in a name of equal length | none |
+| `levenshtein` | The same, plus an inserted or deleted character | none |
+| `damerau` | The same, plus two swapped characters, which is the common typing error | none |
+| `llm` | Anything the rules and the distances miss | one call, all names |
+| `auto` | Clusters offline first, then sends one name per cluster to the model | one call, few names |
 
-LLMs handle this well because it's a **pattern inference** problem, not a
-database lookup. Give the model a set of names, it infers what they mean and
-returns a consistent canonical form.
+The default is `auto`. On the worked example in `example/cohort_messy.csv`, the
+offline pass resolves all 22 names into 8 groups and the model is never called.
 
----
+## The quality control figure
+
+```bash
+uv run samplify propose example/cohort_messy.csv -c sample_id -M damerau \
+  -o mapping.json --plot qc.png
+```
+
+![Quality control figure for example/cohort_messy.csv](docs/img/qc_cohort_messy.png)
+
+Four panels answer the question a person asks before they review anything. The
+similarity matrix on the left is ordered by group, so a block on the diagonal is
+one sample and the outline shows what samplify wants to merge. The three panels
+on the right give the spellings found per sample, the counts before and after,
+and the list of names that need a decision, with the reason for each. The pair
+in red was not merged.
+
+The figure is drawn from the mapping file, so `samplify plot mapping.json -o
+qc.png` redraws it at any point, including after the review.
+
+## The faults it catches
+
+`example/mislabel_catalogue.csv` holds one row per naming fault and carries its
+own answer in a `true_sample` column. The test suite reads that column and
+checks that samplify recovers the 14 real samples from the 24 written names.
+
+| Fault | Reference | As written | Caught by |
+|---|---|---|---|
+| Delimiter dropped | `sample_1` | `sample1` | `rules` |
+| Delimiter changed | `sample_1` | `sample-1` | `rules` |
+| Capital letter | `sample_1` | `Sample_1` | `rules` |
+| All capitals | `sample_4` | `SAMPLE_4` | `rules` |
+| Zero padded number | `sample_3` | `sample_03` | `rules` |
+| Doubled delimiter | `sample_6` | `sample__6` | `rules` |
+| Surrounding space | `sample_7` | `" sample_7 "` | `rules` |
+| Abbreviated word | `sample_8` | `s_8` | `rules` |
+| One letter dropped | `sample_2` | `smple_2` | `damerau` |
+| Two letters swapped | `sample_5` | `sampel_5` | `damerau` |
+
+Three pairs in the same file must not merge, and do not.
+
+| Pair | Why they stay apart |
+|---|---|
+| `sample_9a` and `sample_9b` | The letter after the number identifies the replicate |
+| `sample_11` and `sample_12` | Two different numbers |
+| `sample_10` and `sample_100` | Two different numbers, and reported as a pair to check |
+
+## Numbers are the identity of a sample
+
+`p111` and `p112` sit one edit apart, and they are two different patients.
+Merging them loses a row and reports nothing. Every backend therefore compares
+two names only when their numbers match exactly, and the typo tolerance applies
+to the letters alone. The model is told the same rule, and a merge that the
+model proposes across two different numbers is refused before it reaches the
+mapping file.
+
+The pairs that this rule keeps apart are still worth a look, so samplify reports
+them. A pair is reported when the letters agree and one number gained or lost a
+digit, as in `patient11` against `patient111`. A substituted digit is not
+reported, because `patient111` and `patient112` differ that way and so does
+almost every other pair of samples in a cohort.
 
 ## Install
 
+The package is not on PyPI yet. Install it from git.
+
 ```bash
-pip install samplify
-# or with uv (recommended)
-uv add samplify
+uv add git+https://github.com/wguesdon/samplify
 ```
 
-## Setup
+To work on the repository itself, clone it and sync the environment.
 
-Create a `.env` file in your project root:
+```bash
+git clone https://github.com/wguesdon/samplify.git
+cd samplify
+uv sync
+```
+
+The offline backends need nothing else. To draw the quality control figure,
+install the `plot` extra, which adds matplotlib.
+
+```bash
+uv add "samplify[plot]"
+```
+
+For `llm` and `auto`, create a `.env` file with an
+[OpenRouter](https://openrouter.ai) key.
 
 ```env
 OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_MODEL=openai/gpt-4o-mini   # optional, this is the default
+OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
-Get a free API key at [openrouter.ai](https://openrouter.ai).
+## The three steps
 
----
+samplify separates the proposal, the decision and the change. Each step writes a
+file, so the record shows which of them a person checked.
 
-## Usage
-
-### CLI
+### 1. Propose
 
 ```bash
-samplify "sample_1_batch_1" "sample1_batch2" "sample-1-b3"
-samplify --file my_samples.txt
-samplify --file my_samples.txt --json > mapping.json
-samplify --model anthropic/claude-3-5-haiku "sample_1_b1" "sample1_batch2"
+uv run samplify propose example/cohort_messy.csv --column sample_id -o mapping.json
 ```
 
-### Python API
+This prints the diagnosis, the near misses and the candidate groups, then writes
+`mapping.json`. Every group starts with the status `proposed`.
+
+### 2. Review
+
+```bash
+uv run samplify review mapping.json
+```
+
+This shows one group at a time and asks for a decision. Accept the group, reject
+it, or type a different canonical name. The merges come first, because they
+carry the risk. The command needs a terminal.
+
+### 3. Apply
+
+```bash
+uv run samplify apply mapping.json --output clean.csv --csv-log changes.csv
+```
+
+This never calls a model. The same mapping file and the same input give the same
+output on any machine and on any day. The original column is not touched. A new
+column named `sample_id_canonical` holds the result, so every decision stays
+reversible.
+
+`apply` refuses to run while any group is still `proposed`. It also refuses when
+two groups produce one canonical name in a mapping that no person reviewed,
+because that is a merge nobody decided.
+
+### Without a person
+
+A pipeline can accept every proposal at the propose step.
+
+```bash
+uv run samplify propose data.csv -c sample_id -o mapping.json --yes
+uv run samplify apply mapping.json -o clean.csv
+```
+
+The mapping file then records `"reviewed": false`, and `apply` says so. The
+record stays honest about what was checked.
+
+## A quick look at a few names
+
+```bash
+uv run samplify names "S1_B1" "s1-b1" "s01_b01" "patietn1_batch1"
+```
+
+This writes nothing. Use it to see what a backend does before you point it at a
+file.
+
+## The Python API
 
 ```python
-from samplify import harmonize
+from samplify import propose_csv, apply_mapping
 
-names = ["sample_1_batch_1", "sample1_batch2", "sample-1-b3"]
-result = harmonize(names)
+mapping = propose_csv("samples.csv", "sample_id", method="damerau")
+for group in mapping.merges():
+    print(group.members, "->", group.proposed)
 
-print(result["canonical_pattern"])  # → "sample{n}_batch{m}"
-print(result["mapping"])
-# → {"sample_1_batch_1": "sample1_batch1", "sample-1-b3": "sample1_batch3", ...}
-
-# Apply to a pandas DataFrame
-df["sample_id"] = df["sample_id"].map(result["mapping"])
+mapping.accept_all()
+df, log = apply_mapping(mapping, output_path="clean.csv")
 ```
 
----
-
-## What it handles
-
-| Problem | Example |
-|---|---|
-| Delimiter variation | `sample-1-batch-1` vs `sample_1_batch_1` |
-| Batch abbreviation | `b3` → `batch3` |
-| Replicate abbreviation | `rep2`, `r2` → `replicate2` |
-| Control/condition | `ctrl` → `control`, `ko` → `knockout` |
-| Zero-padding | `sample01` vs `sample1` |
-| Mixed case | `Sample_1` vs `sample_1` |
-
----
-
-## Running tests
+## Tests
 
 ```bash
-uv run pytest -m "not live"   # unit tests, no API key needed
-uv run pytest -m live          # live API tests
+uv run pytest -m "not live"   # 131 unit tests, no API key
+./tests/smoke_test.sh         # the command line end to end, no API key
+uv run pytest -m live         # the model-backed paths, needs a key
 ```
 
----
+`example/README.md` explains what each test file contains and gives the command
+that exercises it.
+
+## Documentation
+
+- [docs/how_it_works.md](docs/how_it_works.md) explains the mapping file, the
+  matching, and the design rules.
+- [example/README.md](example/README.md) is the worked example set.
+- [CHANGELOG.md](CHANGELOG.md) records what changed in each version.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

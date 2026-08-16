@@ -7,3 +7,16 @@ __pycache__/
 dist/
 *.egg-info/
 .DS_Store
+
+# Mapping files and outputs written by a run
+*_mapping.json
+samplify_output/
+
+# Product requirements document, kept local only
+PRD.md
+
+# Personal session work log, kept local only
+SESSION_SUMMARY.md
+
+# Local agent settings, machine specific
+.claude/settings.local.json
