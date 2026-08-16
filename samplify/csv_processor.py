@@ -286,10 +286,17 @@ def _merge_clusters_by_model(
         for rep in reps:
             by_signature.setdefault(matching.digit_signature(rep), []).append(rep)
 
-        for _, safe_reps in sorted(by_signature.items()):
+        canonical_signature = matching.digit_signature(canonical_name)
+        for signature, safe_reps in sorted(by_signature.items()):
             members = sorted(m for rep in safe_reps for m in rep_to_cluster[rep])
             clusters.append(members)
-            canonical[members[0]] = canonical_name
+            # The name belongs to one digit signature only. Giving it to the
+            # other halves of a refused merge would rename p112 to p111 at the
+            # apply step, which is the merge the split just prevented.
+            if signature == canonical_signature:
+                canonical[members[0]] = canonical_name
+            else:
+                canonical[members[0]] = safe_reps[0]
 
     return clusters, canonical
 

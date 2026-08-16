@@ -412,3 +412,73 @@ def test_apply_log_records_that_nobody_reviewed(tmp_path):
     _df, log = apply_mapping(mapping, output_path=tmp_path / "out.csv")
     assert log["reviewed"] is False
     assert log["method"] == "damerau"
+
+
+# ── The model-backed backends, with the model replaced ─────────────────────
+
+
+def test_llm_groups_the_names_the_model_joins(tmp_path):
+    csv_path = tmp_path / "names.csv"
+    csv_path.write_text("sample_id,value\nS1_B1,1\ns1-b1,2\nP2_B1,3\n")
+    answer = {
+        "canonical_pattern": "patientN_batchN",
+        "mapping": {
+            "S1_B1": "patient1_batch1",
+            "s1-b1": "patient1_batch1",
+            "P2_B1": "patient2_batch1",
+        },
+    }
+
+    with patch("samplify.csv_processor.harmonize", return_value=answer):
+        mapping = propose_csv(
+            csv_path, "sample_id", method="llm", api_key="fake-key", model="acme/model-1"
+        )
+
+    assert len(mapping.groups) == 2
+    assert mapping.model == "acme/model-1"
+    merged = [group for group in mapping.groups if len(group.members) == 2][0]
+    assert merged.members == ["S1_B1", "s1-b1"]
+    assert merged.proposed == "patient1_batch1"
+
+
+def test_auto_sends_one_name_for_each_offline_cluster():
+    """The request holds the 8 representatives, not the 22 names in the file."""
+    seen = {}
+
+    def _fake_model(names, **kwargs):
+        seen["names"] = list(names)
+        return {"canonical_pattern": "", "mapping": {name: name for name in names}}
+
+    with patch("samplify.csv_processor.harmonize", side_effect=_fake_model):
+        mapping = propose_csv(EXAMPLE_DIR / "cohort_messy.csv", "sample_id", method="auto")
+
+    assert len(seen["names"]) == 8
+    assert len(mapping.groups) == 8
+
+
+def test_auto_refuses_a_model_merge_across_two_numbers(tmp_path):
+    """The identity rule outranks the model, and the refused half keeps its name.
+
+    Giving the model's canonical name to both halves would rename patient112 to
+    patient111 at the apply step, which is the merge that the split prevented.
+    """
+    csv_path = tmp_path / "patients.csv"
+    csv_path.write_text(
+        "sample_id,value\nP111_B1,1\npatient111_batch1,2\npatient112_batch1,3\n"
+    )
+
+    def _fake_model(names, **kwargs):
+        return {
+            "canonical_pattern": "",
+            "mapping": {name: "patient111_batch1" for name in names},
+        }
+
+    with patch("samplify.csv_processor.harmonize", side_effect=_fake_model):
+        mapping = propose_csv(csv_path, "sample_id", method="auto")
+
+    assert len(mapping.groups) == 2
+    assert {group.proposed for group in mapping.groups} == {
+        "patient111_batch1",
+        "patient112_batch1",
+    }
+    assert mapping.collisions() == {}
