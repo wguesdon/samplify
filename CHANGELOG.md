@@ -9,17 +9,39 @@ command surface or a change that alters which names group together. Those bump
 the major version. A new backend or a new command bumps the minor version. A fix
 that leaves the grouping unchanged bumps the patch version.
 
-## [Unreleased]
+## [0.2.1] - 2026-08-16
 
 ### Fixed
 
+- The `auto` backend now keeps the original name on each group that the identity
+  rule splits off. The model gave one canonical name to two representatives with
+  different numbers. The split kept the two groups apart, but both groups kept
+  the name of the model. A person who accepted both groups renamed
+  `patient112_batch1` to `patient111_batch1` at the apply step.
 - `samplify plot` and `samplify propose --plot` now print the install command
   when matplotlib is absent. The call to `qc_figure` sat outside the `try` block
-  in `samplify/cli.py`, and `plots.py` imports matplotlib inside `qc_figure`, so
-  the missing optional dependency reached the user as a traceback.
+  in `samplify/cli.py`. `plots.py` imports matplotlib inside `qc_figure`, so the
+  missing dependency reached the user as a traceback.
 - An error message now keeps the square brackets of its text. rich read the
   `[plot]` of `uv add "samplify[plot]"` as a style tag and dropped it, so the
   install command that the user read was wrong.
+
+### Added
+
+- Offline tests for the model-backed path, in `tests/test_harmonizer.py` and in
+  `tests/test_csv_processor.py`. They cover the request that goes to OpenRouter,
+  the answers that must raise an error and the model choice. They also cover the
+  `llm` backend and the identity rule when the model proposes to join two
+  numbers.
+
+### Changed
+
+- The README holds what samplify does, the install, one example and the quality
+  control figure. The backend list, the mapping file and the design rules are in
+  `docs/how_it_works.md`. The three documents follow ASD-STE100 Simplified
+  Technical English.
+- The backend count in the documents was four and is six. The guard count in
+  `docs/how_it_works.md` was three and is four.
 
 ## [0.2.0] - 2026-08-16
 
