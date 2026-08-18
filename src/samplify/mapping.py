@@ -430,6 +430,26 @@ class MappingFile:
         # The reviewed field decides whether the collision guard runs, so it is
         # checked and not coerced. bool("false") is True, and a file holding
         # the string would switch the guard off.
+        # Every field is checked, and none is coerced. `list(None)` and
+        # `dict(None)` raise a TypeError, and this class documents ValueError,
+        # so a caller had to catch two kinds of error for one malformed file.
+        for field, kind, label in (
+            ("near_misses", list, "a list"),
+            ("diagnosis", dict, "an object"),
+        ):
+            value = data.get(field)
+            if value is not None and not isinstance(value, kind):
+                raise ValueError(
+                    f"The {field!r} field holds a {type(value).__name__}. "
+                    f"It must be {label}."
+                )
+        for pair in data.get("near_misses") or []:
+            if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                raise ValueError(
+                    f"The 'near_misses' field holds {pair!r}. Every entry is a "
+                    f"pair of names."
+                )
+
         reviewed = data.get("reviewed", False)
         if not isinstance(reviewed, bool):
             raise ValueError(
@@ -461,8 +481,8 @@ class MappingFile:
             reviewed=reviewed,
             reviewed_at=data.get("reviewed_at"),
             created=str(data.get("created", _now())),
-            diagnosis=dict(data.get("diagnosis", {})),
-            near_misses=[list(p) for p in data.get("near_misses", [])],
+            diagnosis=dict(data.get("diagnosis") or {}),
+            near_misses=[list(p) for p in data.get("near_misses") or []],
             canonical_pattern=str(data.get("canonical_pattern", "")),
             schema_version=int(version),
         )

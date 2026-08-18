@@ -835,3 +835,20 @@ def test_the_rules_backend_splits_a_word_from_its_number_in_any_script():
     assert matching.group_names(["Пациент٠١", "Пациент١"], method="rules") == [
         ["Пациент٠١", "Пациент١"]
     ]
+
+
+def test_padding_falls_away_when_a_letter_follows_the_number():
+    """A pattern that ended at the digits left `sample001a` with its padding.
+
+    `digit_signature` had already read the two as one identity, and the rules
+    backend still kept them apart.
+    """
+    assert matching.rule_normalise("sample001a") == matching.rule_normalise("sample1a")
+    assert matching.group_names(["sample001a", "sample1a"], method="rules") == [
+        ["sample001a", "sample1a"]
+    ]
+    # The replicate letter still identifies the sample.
+    assert matching.group_names(["sample_9a", "sample_9b"], method="damerau") == [
+        ["sample_9a"],
+        ["sample_9b"],
+    ]

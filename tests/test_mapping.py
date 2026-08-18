@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from samplify import cli
 from samplify import mapping as mapping_module
 from samplify.mapping import (
     STATUS_ACCEPTED,
@@ -479,3 +480,54 @@ def test_an_ordinary_count_is_accepted():
                   status=STATUS_ACCEPTED, occurrences={"s_1": 2})
     group.validate()
     assert group.rows == 2
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("near_misses", True),
+        ("near_misses", 7),
+        ("near_misses", "text"),
+        ("near_misses", [["only one"]]),
+        ("near_misses", ["not a pair"]),
+        ("diagnosis", True),
+        ("diagnosis", 7),
+        ("diagnosis", []),
+    ],
+)
+def test_a_malformed_top_level_field_is_refused(field, value):
+    """`list(None)` and `dict(None)` raise a TypeError, and this class documents
+    ValueError, so a caller had to catch two kinds of error for one file."""
+    with pytest.raises(ValueError):
+        MappingFile.from_dict({"schema_version": 1, "groups": [], field: value})
+
+
+@pytest.mark.parametrize("field", ["near_misses", "diagnosis"])
+def test_a_null_top_level_field_reads_as_empty(field):
+    """A file that omits the field and a file that holds null read alike."""
+    result = MappingFile.from_dict({"schema_version": 1, "groups": [], field: None})
+    assert getattr(result, field) in ([], {})
+
+
+def test_no_malformed_mapping_file_reaches_the_user_as_a_traceback(tmp_path):
+    """Every command answers a malformed file with a message and exit code 1."""
+    documents = [
+        "[]", "null", "7", '"text"', "{}", "not json at all",
+        '{"schema_version": 2, "groups": []}',
+        '{"schema_version": 1}',
+        '{"schema_version": 1, "groups": [null]}',
+        '{"schema_version": 1, "groups": {}}',
+        '{"schema_version": 1, "groups": [], "reviewed": "yes"}',
+        '{"schema_version": 1, "groups": [], "near_misses": null}',
+        '{"schema_version": 1, "groups": [], "near_misses": 7}',
+        '{"schema_version": 1, "groups": [], "diagnosis": 7}',
+    ]
+    for index, document in enumerate(documents):
+        path = tmp_path / f"{index}.json"
+        path.write_text(document)
+        for command in (
+            ["review", str(path)],
+            ["apply", str(path)],
+            ["plot", str(path), "-o", str(tmp_path / "q.png")],
+        ):
+            assert cli.main(command) in (0, 1), (command[0], document)

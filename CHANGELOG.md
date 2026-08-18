@@ -13,6 +13,30 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.8] - 2026-08-18
+
+The fifteenth review reported that no finding is major. Its one finding is
+below, with two more that came from sweeping every field of a mapping file
+myself rather than waiting for a sixteenth pass to name them.
+
+### Fixed
+
+- Zero padding falls away when a letter follows the number. The pattern ended
+  at the digits, so `sample001a` kept its padding while `sample001` lost it,
+  and `digit_signature` had already read `sample001a` and `sample1a` as one
+  identity while the rules backend kept them apart.
+- `near_misses` and `diagnosis` are checked and not coerced. `list(None)` and
+  `dict(None)` raise a `TypeError`, and this class documents `ValueError`, so a
+  malformed file reached the user as a traceback from `review`, from `apply`
+  and from `plot`. A file that holds `null` for either field reads as empty, as
+  a file that omits it always has.
+
+### Added
+
+- A test that gives every command fourteen malformed mapping files, including
+  a JSON array, a bare number and text that is not JSON at all, and asserts
+  that each one answers with a message rather than a traceback.
+
 ## [0.10.7] - 2026-08-18
 
 The fourteenth review reported that no finding is major.
