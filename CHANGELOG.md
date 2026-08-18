@@ -13,6 +13,37 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.8.1] - 2026-08-18
+
+A second review of the repaired code found four defects. Three of them merged
+two different samples or accepted a value that no mapping file should hold.
+
+### Fixed
+
+- Neither model backend may merge two names that differ by one substituted
+  letter. The offline path has refused that since 0.7.0 and the model path did
+  not, so a model that answered `primary_cells` for both merged
+  `Primary B cells` with `Primary T cells`. Neither name carries a digit, so
+  the identity signature is empty for both and the digit guard alone let them
+  through. A forbidden pair anywhere in a cluster now sends the whole cluster
+  back to one group per letter skeleton. A cluster with no forbidden pair is
+  untouched, so the model still joins `ctrl_1` with `control_1`, which is three
+  edits and the reason the model backends exist.
+- A canonical name that the model returns must be a string that holds a
+  character, and the `mapping` it returns must be an object. `str(None)` gave
+  the string `None`, and every member of that group took those four characters
+  as its sample name.
+- The `members` of a group must be a list. A string is iterable, so
+  `"members": "AB"` passed every check and became the two samples `A` and `B`.
+  The `groups` key must be a list for the same reason.
+
+### Not changed
+
+The apply log records the time of the run, so two runs write two different
+logs. That value describes the run and not the result, the output CSV holds no
+time value, and `docs/how_it_works.md` says so. The review reported it and it
+stays as it is.
+
 ## [0.8.0] - 2026-08-18
 
 ### Removed

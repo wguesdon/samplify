@@ -304,6 +304,23 @@ def _parse_answer(raw: str | None, names: list[str]) -> dict:
             else "The model returned JSON that is not an object."
         )
 
+    if not isinstance(result["mapping"], dict):
+        raise ValueError(
+            f"The model returned a 'mapping' that is not an object. "
+            f"Got {type(result['mapping']).__name__}."
+        )
+
+    # A canonical name is checked and never coerced. str(None) gives the string
+    # None, and every member of that group would take those four characters as
+    # its sample name.
+    for name, canonical in result["mapping"].items():
+        if not isinstance(canonical, str) or not canonical.strip():
+            raise ValueError(
+                f"The model gave the name {name!r} the canonical form "
+                f"{canonical!r}. A canonical name must be a string that holds "
+                f"a character."
+            )
+
     # A name the model dropped keeps its original form. Losing a name here
     # would drop rows at the apply step.
     for name in names:

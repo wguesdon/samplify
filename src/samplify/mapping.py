@@ -133,6 +133,13 @@ class Group:
                 f"Group {data['id']} has status {data['status']!r}, "
                 f"which is not one of {STATUSES}."
             )
+        # A string is iterable, so a members value of "AB" would pass every
+        # check below and become the two samples A and B.
+        if not isinstance(data["members"], list):
+            raise ValueError(
+                f"Group {data['id']} has members of type "
+                f"{type(data['members']).__name__}. It must be a list of names."
+            )
         if not data["members"]:
             raise ValueError(f"Group {data['id']} has no members.")
 
@@ -325,6 +332,11 @@ class MappingFile:
             )
         if "groups" not in data:
             raise ValueError("Mapping file has no 'groups' key.")
+        if not isinstance(data["groups"], list):
+            raise ValueError(
+                f"The 'groups' key holds a {type(data['groups']).__name__}. "
+                f"It must be a list."
+            )
 
         # The reviewed field decides whether the collision guard runs, so it is
         # checked and not coerced. bool("false") is True, and a file holding

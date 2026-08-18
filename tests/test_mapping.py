@@ -302,3 +302,21 @@ def test_a_failed_write_keeps_the_previous_file(tmp_path, monkeypatch):
 
     assert path.read_text() == before
     assert list(tmp_path.iterdir()) == [path]
+
+
+def test_members_must_be_a_list():
+    """A string is iterable, so "AB" would become the two samples A and B."""
+    document = {
+        "id": 1,
+        "members": "AB",
+        "proposed": "merged",
+        "final": "merged",
+        "status": STATUS_ACCEPTED,
+    }
+    with pytest.raises(ValueError, match="must be a list of names"):
+        Group.from_dict(document)
+
+
+def test_the_groups_key_must_be_a_list():
+    with pytest.raises(ValueError, match="must be a list"):
+        MappingFile.from_dict({"schema_version": 1, "groups": {"id": 1}})

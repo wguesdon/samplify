@@ -614,3 +614,64 @@ def test_the_llm_backend_keeps_two_numbers_apart():
 
     assert [g.members for g in result.groups] == [["p111"], ["p112"]]
     assert sorted(g.proposed for g in result.groups) == ["patient111", "patient112"]
+
+
+# ── The review findings of 2026-08-18, second pass ─────────────────────────
+
+
+def _answer(mapping: dict) -> dict:
+    return {"canonical_pattern": "", "mapping": mapping}
+
+
+@pytest.mark.parametrize("method", ["llm", "auto"])
+def test_the_model_may_not_merge_across_a_substituted_letter(method):
+    """The offline path refuses this merge, so the model path must too.
+
+    Both names carry no digit, so the identity signature is empty for each and
+    the digit guard alone lets them through. Primary B cells and Primary T
+    cells are the two major lymphocyte lineages.
+    """
+    names = ["Primary B cells", "Primary T cells"]
+    keys = names if method == "llm" else ["primary_b_cells", "primary_t_cells"]
+
+    with patch("samplify.csv_processor.harmonize",
+               return_value=_answer({k: "primary_cells" for k in keys})):
+        result = propose(names, method=method, api_key="test")
+
+    assert [g.members for g in result.groups] == [["Primary B cells"], ["Primary T cells"]]
+
+
+@pytest.mark.parametrize("method", ["llm", "auto"])
+def test_the_model_may_still_join_two_spellings_of_one_word(method):
+    """The rule blocks a substitution and nothing else.
+
+    ctrl and control are three edits apart, so no rule refuses them, and
+    joining them is the reason the model backends exist.
+    """
+    names = ["ctrl_1", "control_1", "CONTROL-1"]
+    keys = names if method == "llm" else ["ctrl1", "control1"]
+
+    with patch("samplify.csv_processor.harmonize",
+               return_value=_answer({k: "control_1" for k in keys})):
+        result = propose(names, method=method, api_key="test")
+
+    assert len(result.groups) == 1
+    assert result.groups[0].proposed == "control_1"
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        '{"mapping": {"control": null}}',
+        '{"mapping": {"control": 7}}',
+        '{"mapping": {"control": "   "}}',
+        '{"mapping": ["control"]}',
+    ],
+)
+def test_a_canonical_name_the_model_returns_must_be_a_name(answer):
+    """str(None) gives the string None, and a group would take those four
+    characters as its sample name."""
+    from samplify.harmonizer import _parse_answer
+
+    with pytest.raises(ValueError):
+        _parse_answer(answer, ["control"])
