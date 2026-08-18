@@ -531,3 +531,29 @@ def test_no_malformed_mapping_file_reaches_the_user_as_a_traceback(tmp_path):
             ["plot", str(path), "-o", str(tmp_path / "q.png")],
         ):
             assert cli.main(command) in (0, 1), (command[0], document)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["input_file", "column", "model", "provider", "base_url",
+     "canonical_pattern", "method", "created", "reviewed_at"],
+)
+@pytest.mark.parametrize("value", [1, True, [], {}, 3.5])
+def test_every_text_field_of_a_mapping_file_must_be_text(field, value):
+    """`Path(1)` raises a TypeError further down, and this class documents
+    ValueError, so `apply` showed a traceback for a malformed mapping."""
+    with pytest.raises(ValueError, match="must be text"):
+        MappingFile.from_dict({"schema_version": 1, "groups": [], field: value})
+
+
+@pytest.mark.parametrize("field", ["input_file", "column", "model", "base_url"])
+def test_a_null_text_field_reads_as_absent(field):
+    result = MappingFile.from_dict({"schema_version": 1, "groups": [], field: None})
+    assert getattr(result, field) is None
+
+
+def test_apply_refuses_a_mapping_whose_input_file_is_not_text(tmp_path, capsys):
+    path = tmp_path / "mapping.json"
+    path.write_text('{"schema_version":1,"groups":[],"input_file":1,"column":"sample_id"}')
+    assert cli.main(["apply", str(path)]) == 1
+    assert "must be text" in " ".join(capsys.readouterr().out.split())

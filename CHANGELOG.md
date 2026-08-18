@@ -13,6 +13,19 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.11.1] - 2026-08-18
+
+The seventeenth review reported that it found no major defect. Its one finding
+named one field, and the whole sub-class is closed instead.
+
+### Fixed
+
+- Every text field of a mapping file is checked. `input_file`, `column`,
+  `model`, `provider`, `base_url`, `canonical_pattern`, `method`, `created` and
+  `reviewed_at` must each be text or absent. `Path(1)` raises a `TypeError`
+  further down, and this class documents `ValueError`, so `apply` showed a
+  traceback for a malformed mapping instead of refusing it.
+
 ## [0.11.0] - 2026-08-18
 
 The sixteenth review reported that it found no major defect. Its one finding

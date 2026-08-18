@@ -443,6 +443,20 @@ class MappingFile:
                     f"The {field!r} field holds a {type(value).__name__}. "
                     f"It must be {label}."
                 )
+        # Every field that names a file, a column or a model is text. `Path(1)`
+        # and a comparison against an integer both raise a TypeError further
+        # down, and this class documents ValueError.
+        for field in (
+            "input_file", "column", "model", "provider", "base_url",
+            "canonical_pattern", "method", "created", "reviewed_at",
+        ):
+            value = data.get(field)
+            if value is not None and not isinstance(value, str):
+                raise ValueError(
+                    f"The {field!r} field holds a {type(value).__name__}. "
+                    f"It must be text."
+                )
+
         for pair in data.get("near_misses") or []:
             if not isinstance(pair, (list, tuple)) or len(pair) != 2:
                 raise ValueError(
