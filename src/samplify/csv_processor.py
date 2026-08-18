@@ -231,7 +231,15 @@ def propose(
     unique = sorted(set(names))
     occurrences = occurrences or {}
     findings = diagnose(unique)
-    near_misses = [list(pair) for pair in matching.find_near_misses(unique)]
+    # Both reports hold pairs that samplify refuses to merge and a person has
+    # to decide. The first differ by one digit and the second by one letter.
+    near_misses = [
+        list(pair)
+        for pair in sorted(
+            set(matching.find_near_misses(unique))
+            | set(matching.find_letter_variants(unique))
+        )
+    ]
     canonical_pattern = ""
     used_model: str | None = None
     used_provider: str | None = None

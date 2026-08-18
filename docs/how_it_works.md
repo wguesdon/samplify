@@ -271,15 +271,39 @@ Two names with no letter at all never match. The ratio compares two empty
 strings and scores 1.0, which reads as agreement and is the absence of any
 evidence.
 
-One substituted letter does not match at every ratio, and it must be above the
-threshold. A substitution is the one edit that also changes the meaning. The
-names `batch_a1` and `batch_b1` differ by one substitution, and they are two
-different batches.
+One substituted letter never merges two names. It is the one edit that also
+carries meaning, and on the reference corpus it carried meaning every time.
+`Primary B cells` merged with `Primary T cells`, `human cTEC5` with
+`human mTEC5`, `Decell A549 #1` with `Recell A549 #1`, and `TSmatKO-1` with
+`TSpatKO-1`. Not one of the 42 pairs that a substitution merged there was a
+typing error.
+
+A refused pair still reaches a person. `find_letter_variants` reports it next to
+the pairs that one digit separates, and the two lists share the `near_misses`
+field of the mapping file.
+
+samplify drops a pair when more than two letters stand at the position that
+differs, because such a position is a field of the naming scheme and not a
+typing error. A 96-well plate writes `A07` through `H07`, and one study of the
+corpus held 1351 wells and produced 1754 pairs without the rule.
+`MAX_VARIANT_LETTERS` holds the limit, and the rule matches the one that drops a
+number sitting inside a series.
 
 ## Near misses
 
-A near miss is a pair that the identity rule keeps apart and that a person must
-still examine. samplify reports a pair when the letters are identical and exactly
+A near miss is a pair that samplify keeps apart and that a person must still
+examine. Two searches fill the report and both write into the `near_misses`
+field of the mapping file.
+
+| Search | What it reports |
+|---|---|
+| `find_near_misses` | The letters are identical and exactly one number has one digit more or one digit less. |
+| `find_letter_variants` | The numbers are identical and exactly one letter differs. |
+
+The rest of this section describes the first search. The second is in the
+section on the distances.
+
+samplify reports a pair when the letters are identical and exactly
 one number has one more digit or one less digit.
 
 samplify drops a pair when the number series of the dataset contains both
@@ -447,7 +471,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 216 offline tests, no key and no server
+uv run pytest                 # 222 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

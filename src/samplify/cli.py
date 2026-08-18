@@ -118,23 +118,36 @@ def _print_diagnosis(findings: dict) -> None:
     console.print(Panel("\n".join(lines), title="[bold]Diagnosis[/bold]", expand=False))
 
 
+#: The most pairs the console prints before it gives a count instead. A large
+#: study produces hundreds, and the mapping file holds every one of them.
+NEAR_MISS_DISPLAY_LIMIT = 20
+
+
 def _print_near_misses(pairs: list[list[str]]) -> None:
-    """Print the pairs that read alike but carry different numbers."""
+    """Print the pairs that samplify refuses to merge."""
     if not pairs:
         return
     table = Table(
         show_header=True,
         header_style="bold red",
-        title="Similar names with different numbers, never merged automatically",
+        title="Similar names that samplify never merges automatically",
     )
     table.add_column("Name A", style="yellow")
     table.add_column("Name B", style="yellow")
-    for left, right in pairs:
-        table.add_row(left, right)
+    table.add_column("Difference")
+    for left, right in pairs[:NEAR_MISS_DISPLAY_LIMIT]:
+        table.add_row(left, right, matching.describe_difference(left, right))
     console.print(table)
+
+    if len(pairs) > NEAR_MISS_DISPLAY_LIMIT:
+        console.print(
+            f"[yellow]{len(pairs) - NEAR_MISS_DISPLAY_LIMIT} more pair(s) are in "
+            f"the mapping file and not in this table.[/yellow]"
+        )
     console.print(
-        "[dim]Check each pair. Two patients, or one patient and a typed digit, "
-        "look identical to the tool.[/dim]\n"
+        "[dim]Check each pair. Two patients and one patient with a typed digit "
+        "look identical to the tool, and so do two cell types that differ by "
+        "one letter.[/dim]\n"
     )
 
 

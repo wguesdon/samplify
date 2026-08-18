@@ -244,7 +244,16 @@ def _panel_flags(ax: Any, mapping: MappingFile) -> None:
 
     rows: list[tuple[str, str, str, str]] = []
     for pair in mapping.near_misses:
-        rows.append((_shorten(pair[0]), _shorten(pair[1]), "digit added or dropped", "no"))
+        # The reason is read from the pair. The panel named every one of them a
+        # digit slip, and the report also holds pairs that differ by one letter.
+        rows.append(
+            (
+                _shorten(pair[0]),
+                _shorten(pair[1]),
+                matching.describe_difference(pair[0], pair[1]),
+                "no",
+            )
+        )
 
     for group in sorted(mapping.merges(), key=lambda g: -len(g.members)):
         reference = group.proposed

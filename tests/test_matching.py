@@ -578,3 +578,73 @@ def test_the_abbreviations_still_expand_across_a_hyphen():
     assert matching.group_names(
         ["ctrl-r1-batch1", "CTRL_rep1_b1"], method="damerau"
     ) == [["CTRL_rep1_b1", "ctrl-r1-batch1"]]
+
+
+# ── A substituted letter is reported and never merged ──────────────────────
+
+
+def test_a_substituted_letter_never_merges():
+    """It is the one edit that also carries meaning, and on real data it did.
+
+    Every one of the 42 pairs that a substitution merged on the ENA corpus was
+    two different samples. These four are from PRJDB14694, PRJDB12299,
+    PRJDB12972 and PRJDB15361.
+    """
+    for pair in (
+        ["Primary B cells", "Primary T cells"],
+        ["human cTEC5", "human mTEC5"],
+        ["TSmatKO-1_paired-RNA", "TSpatKO-1_paired-RNA"],
+        ["Decell A549 #1", "Recell A549 #1"],
+    ):
+        assert len(matching.group_names(pair, method="damerau")) == 2, pair
+
+
+def test_a_substituted_letter_is_reported_instead():
+    """A refused pair still reaches a person."""
+    assert matching.find_letter_variants(["Primary B cells", "Primary T cells"]) == [
+        ("Primary B cells", "Primary T cells")
+    ]
+    assert matching.find_letter_variants(["human cTEC5", "human mTEC5"]) == [
+        ("human cTEC5", "human mTEC5")
+    ]
+
+
+def test_a_letter_variant_needs_the_same_numbers():
+    """Two names with different numbers are a different report."""
+    assert matching.find_letter_variants(["human cTEC5", "human mTEC7"]) == []
+
+
+def test_a_plate_row_is_not_reported():
+    """Eight row letters stand at one position, so the position is a field.
+
+    PRJEB20147 holds 1351 plate wells and produced 1754 pairs without this
+    rule, which buries the two or three that matter.
+    """
+    plate = [f"SCGC-1231_{row}07" for row in "ABCDEFGH"]
+    assert matching.find_letter_variants(plate) == []
+
+    # Two letters at the position is a contrast, and it is still reported.
+    assert matching.find_letter_variants(plate[:2]) == [
+        ("SCGC-1231_A07", "SCGC-1231_B07")
+    ]
+
+
+def test_one_keystroke_still_merges_and_is_not_reported():
+    for pair in (
+        ["smple_1", "sample_1"],
+        ["sampel_5", "sample_5"],
+        ["patietn1_batch1", "patient1_batch1"],
+    ):
+        assert len(matching.group_names(pair, method="damerau")) == 1, pair
+        assert matching.find_letter_variants(pair) == [], pair
+
+
+def test_padding_behind_a_symbol_reads_as_formatting():
+    """malaria5#02 and malaria5#2 are one sample of PRJDB2573.
+
+    The number sign stops the token from reaching the zero-padding rule, so the
+    two normalise differently. Their letters and their numbers both agree, so
+    the difference is formatting and the figure must say so.
+    """
+    assert matching.describe_difference("malaria5#02", "malaria5#2") == "formatting only"
+    assert len(matching.group_names(["malaria5#02", "malaria5#2"], method="damerau")) == 1

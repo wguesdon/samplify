@@ -63,6 +63,15 @@ MIN_SLIP_LENGTH = 5
 #: this tool prefers. A wrong merge drops a row and reports nothing.
 MAX_TYPO_EDITS = 1
 
+#: The most letters that may stand at one position before
+#: :func:`find_letter_variants` treats that position as a field of the naming
+#: scheme rather than a typing error. A 96-well plate writes ``A07`` through
+#: ``H07``, and eight row letters stand at one position. Reporting the 28 pairs
+#: that a plate row produces buries the two or three that matter. One study of
+#: the reference corpus, PRJEB20147, held 1351 plate wells and produced 1754
+#: such pairs.
+MAX_VARIANT_LETTERS = 2
+
 #: The characters that identify a sample where they stand. A hyphen is here
 #: because :func:`samplify.rules.prepare` has already replaced every hyphen
 #: that separates two tokens, so any hyphen left is a sign.
@@ -522,6 +531,12 @@ def describe_difference(a: str, b: str) -> str:
         return "formatting only"
 
     left, right = letter_skeleton(a), letter_skeleton(b)
+    # The numbers agree, because the signatures did, and the letters agree too.
+    # Whatever is left differs in punctuation or in zero padding, and that is
+    # formatting. `malaria5#02` and `malaria5#2` reach this line, because the
+    # number sign stops the token from reaching the zero-padding rule.
+    if left == right:
+        return "formatting only"
     if damerau_levenshtein_distance(left, right, max_distance=1) != 1:
         return "unrelated"
     if len(left) != len(right):
@@ -600,10 +615,20 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     if distance > MAX_TYPO_EDITS:
         return False
 
+    # A substituted letter never merges on its own. It is the one edit that
+    # also carries meaning, and on 20000 real ENA runs it carried meaning every
+    # time: Primary B cells against Primary T cells, cTEC against mTEC, Decell
+    # against Recell, TSmatKO against TSpatKO. Not one of the 42 pairs it
+    # merged there was a typing error. :func:`find_letter_variants` reports the
+    # pair instead, so a person still sees it.
+    difference = describe_difference(a, b)
+    if difference == "substitution":
+        return False
+
     if (
         method != "hamming"
         and min(len(left), len(right)) >= MIN_SLIP_LENGTH
-        and describe_difference(a, b) in SLIP_KINDS
+        and difference in SLIP_KINDS
     ):
         return True
 
@@ -670,6 +695,60 @@ def find_near_misses(names: list[str]) -> list[tuple[str, str]]:
                     continue
                 for left in holders:
                     for right in others:
+                        if left != right:
+                            pairs.add((min(left, right), max(left, right)))
+
+    return sorted(pairs)
+
+
+def find_letter_variants(names: list[str]) -> list[tuple[str, str]]:
+    """Find pairs that carry one substituted letter and the same numbers.
+
+    A substitution is the one edit that also carries meaning, so samplify never
+    merges on it. The pair still deserves a person, because the same shape also
+    describes a real typing error. This function reports it.
+
+    The evidence is a run over 20000 human RNA-seq runs of the ENA archive.
+    Every one of the 42 pairs that a substitution merged there was two
+    different samples. ``Primary B cells`` against ``Primary T cells`` and
+    ``human cTEC5`` against ``human mTEC5`` are two of them.
+
+    A position that many letters occupy is a field of the naming scheme and not
+    a typing error, so samplify drops it. A 96-well plate writes ``A07`` and
+    ``E07``, and eight row letters stand at that position. Reporting every pair
+    of them buries the real cases, exactly as reporting every substituted digit
+    would. :data:`MAX_VARIANT_LETTERS` holds the limit.
+
+    The search is indexed. Two names one substitution apart agree on their
+    numbers, on the length of their letters and on every letter but one, so
+    samplify builds one key from that agreement and reads the letters that
+    differ under it.
+
+    Args:
+        names: The unique raw sample names.
+
+    Returns:
+        Every pair as a sorted tuple, in a deterministic order.
+    """
+    unique = sorted(set(names))
+
+    buckets: dict[tuple[tuple[str, ...], str, str], dict[str, list[str]]] = {}
+    for name in unique:
+        signature = digit_signature(name)
+        skeleton = letter_skeleton(name)
+        for index in range(len(skeleton)):
+            key = (signature, skeleton[:index], skeleton[index + 1:])
+            buckets.setdefault(key, {}).setdefault(skeleton[index], []).append(name)
+
+    pairs: set[tuple[str, str]] = set()
+    for by_letter in buckets.values():
+        if not 2 <= len(by_letter) <= MAX_VARIANT_LETTERS:
+            continue
+        letters = sorted(by_letter)
+        for position, letter in enumerate(letters):
+            for other in letters[position + 1:]:
+                for left in by_letter[letter]:
+                    for right in by_letter[other]:
                         if left != right:
                             pairs.add((min(left, right), max(left, right)))
 

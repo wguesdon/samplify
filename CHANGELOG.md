@@ -13,6 +13,51 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.7.0] - 2026-08-18
+
+### Fixed
+
+- A substituted letter never merges two names on its own. It is the one edit
+  that also carries meaning, and on the ENA corpus it carried meaning every
+  time. `Primary B cells` merged with `Primary T cells`, `human cTEC5` with
+  `human mTEC5`, `Decell A549 #1` with `Recell A549 #1`, `UV_m_cont_293_1` with
+  `UV_p_cont_293_1` and `TSmatKO-1` with `TSpatKO-1`. Not one of the 42 pairs
+  it merged there was a typing error.
+- `describe_difference` reads two names with the same numbers and the same
+  letters as a formatting difference. It called them unrelated, and
+  `malaria5#02` against `malaria5#2` is that shape, because the number sign
+  stops the token from reaching the zero-padding rule. The figure and the
+  console print that label, so both said unrelated about a correct merge.
+
+### Added
+
+- `find_letter_variants` reports each pair that one substituted letter
+  separates, so a refused pair still reaches a person. The pairs join
+  `near_misses` in the mapping file, next to the pairs that one digit
+  separates. The search is indexed and takes 0.5 seconds on 3243 names.
+- `MAX_VARIANT_LETTERS` drops a position that more than two letters occupy,
+  because such a position is a field of the naming scheme and not a typing
+  error. A 96-well plate writes `A07` through `H07`, and PRJEB20147 holds 1351
+  wells and produced 1754 pairs without the rule. It produces 118 with it.
+- The console prints the reason next to each reported pair, and it prints at
+  most 20 pairs and then the count of the rest. The mapping file holds all of
+  them.
+
+### Changed
+
+- The figure reads the reason of each reported pair instead of naming every one
+  of them a digit slip.
+
+samplify now proposes 32 merges on the ENA corpus, and every one of them was
+read by hand and is correct. The count was 350 in version 0.4.1.
+
+| Version | Merges proposed | Wrong by reading |
+|---|---|---|
+| 0.4.1 | 350 | 246 above one edit, plus the classes below |
+| 0.5.0, the edit cap | 104 | 42 substitutions, 30 dropped signs |
+| 0.6.0, the signs | 74 | 42 substitutions |
+| 0.7.0, the substitutions | 32 | None found |
+
 ## [0.6.0] - 2026-08-18
 
 ### Fixed
@@ -37,12 +82,6 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 On the ENA corpus this removed 30 merges and added none. Every one of the 30
 joined two different samples, among them `ICESeq(+)` with `ICESeq(++)` and with
 `ICESeq(-)`, and `CXCR5+` with `CXCR5-`. 74 merges remain.
-
-### Known and not fixed
-
-A substituted letter is still judged against the whole name and not against the
-token it sits in. That is 42 of the 74 merges that remain, and `TSmatKO-1`
-merged with `TSpatKO-1` is one of them.
 
 ## [0.5.0] - 2026-08-18
 
