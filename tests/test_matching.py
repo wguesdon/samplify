@@ -918,3 +918,42 @@ def test_a_position_of_more_letters_is_a_field_of_the_scheme():
 def test_the_variant_limit_is_the_measured_one():
     """This test fails if someone raises the limit, and it says why."""
     assert matching.MAX_VARIANT_LETTERS == 2
+
+
+# ── A sign is a sign in every typeface ─────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "left,right,label",
+    [
+        ("WT2-1′", "WT2-1", "a typographic prime"),
+        ("WT2-1’", "WT2-1", "a right single quotation mark"),
+        ("CD4−_donor1", "CD4_donor1", "a Unicode minus"),
+        ("CD4–_donor1", "CD4_donor1", "an en dash"),
+        ("CD4—_donor1", "CD4_donor1", "an em dash"),
+        ("CD4＋_donor1", "CD4_donor1", "a fullwidth plus"),
+        ("CD4±_donor1", "CD4_donor1", "a plus-minus sign"),
+    ],
+)
+def test_a_sign_identifies_a_sample_in_every_typeface(left, right, label):
+    """A name that arrives from a word processor carries the typographic sign.
+
+    Only the ASCII prime and hyphen were kept, so `WT2-1′` merged with `WT2-1`
+    and `CD4−_donor1` merged with `CD4_donor1`.
+    """
+    assert len(matching.group_names([left, right], method="damerau")) == 2, label
+
+
+@pytest.mark.parametrize(
+    "dash", ["-", "‐", "‑", "‒", "–", "—", "―",
+             "−", "－"]
+)
+def test_every_dash_separates_two_tokens_where_a_hyphen_would(dash):
+    """The position decides, and it decides the same for each of them.
+
+    The members are compared as a set, because the ASCII hyphen sorts before
+    the underscore and every other dash sorts after it.
+    """
+    groups = matching.group_names([f"S1{dash}B1", "S1_B1"], method="damerau")
+    assert len(groups) == 1
+    assert set(groups[0]) == {f"S1{dash}B1", "S1_B1"}

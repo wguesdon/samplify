@@ -632,8 +632,12 @@ def apply_mapping(
     # character of a shell command is the difference between
     # --output clean.csv and --output data.csv.
     inputs = [("the input", path)]
-    if mapping_path is not None:
-        inputs.append(("the mapping file", Path(mapping_path)))
+    # The caller may name the mapping file, and a mapping that was read from
+    # one remembers its own path. Without the second source a library caller
+    # that read the file and passed no path could write over it.
+    for candidate in (mapping_path, mapping.source_path):
+        if candidate is not None:
+            inputs.append(("the mapping file", Path(candidate)))
     for label, destination in (
         ("--output", output_path),
         ("--json-log", json_log_path),

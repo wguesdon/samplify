@@ -253,6 +253,12 @@ hyphen anywhere else is a sign. `rules.prepare` applies that rule one time, and
 both the tokens and the identity signature read its result, so the two can never
 disagree about a hyphen.
 
+A sign is a sign in every typeface. A name that arrives from a word processor
+carries the typographic prime and the Unicode minus rather than the ASCII ones,
+and `rules.IDENTITY_SIGNS` and `rules.HYPHENS` hold both. Only the ASCII forms
+were kept until version 0.12.0, so `WT2-1′` merged with `WT2-1` and
+`CD4−_donor1` merged with `CD4_donor1`.
+
 The number sign is deliberately not a sign. In `#111_b2` it reads as the word
 number and it identifies nothing. The asterisk is absent for the same reason,
 because it marks a footnote more often than a sample.
@@ -534,7 +540,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 465 offline tests, no key and no server
+uv run pytest                 # 482 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

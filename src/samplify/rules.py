@@ -30,12 +30,38 @@ DELIMITER_PATTERN = r"[_.\s]"
 #: number and identifies nothing, and no name in the reference corpus used it
 #: as a sign. The asterisk is absent for the same reason, because it marks a
 #: footnote more often than a sample.
-IDENTITY_SIGNS = "+'"
+IDENTITY_SIGNS = (
+    "+'"
+    "\u2032"  # PRIME, which a laboratory writes for a variant of a name
+    "\u2033"  # DOUBLE PRIME
+    "\u2019"  # RIGHT SINGLE QUOTATION MARK, which a word processor makes of '
+    "\u00b1"  # PLUS-MINUS SIGN
+    "\uff0b"  # FULLWIDTH PLUS SIGN
+)
+
+#: Every character a keyboard, a word processor or a journal uses for a hyphen
+#: or a minus. `CD4−` with a Unicode minus and `CD4-` with the ASCII one mean
+#: the same, and each one identifies a sample where it stands.
+HYPHENS = (
+    "-"
+    "\u2010"  # HYPHEN
+    "\u2011"  # NON-BREAKING HYPHEN
+    "\u2012"  # FIGURE DASH
+    "\u2013"  # EN DASH
+    "\u2014"  # EM DASH
+    "\u2015"  # HORIZONTAL BAR
+    "\u2212"  # MINUS SIGN
+    "\uff0d"  # FULLWIDTH HYPHEN-MINUS
+)
 
 #: A hyphen between two alphanumeric characters separates two tokens, as in
 #: ``s1-b1``. A hyphen in any other position is a sign that belongs to the
-#: token it touches, as in ``dox-``, which is the opposite of ``dox+``.
-_SEPARATING_HYPHEN = re.compile(r"(?<=[^\W_])-(?=[^\W_])")
+#: token it touches, as in ``dox-``, which is the opposite of ``dox+``. Every
+#: character in :data:`HYPHENS` reads the same way, because a name that arrives
+#: from a word processor carries the typographic one.
+_SEPARATING_HYPHEN = re.compile(
+    rf"(?<=[^\W_])[{re.escape(HYPHENS)}](?=[^\W_])"
+)
 
 
 #: Characters a fully canonical name may hold. :func:`is_canonical` reports
@@ -47,7 +73,9 @@ CANONICAL_CHARSET = re.compile(r"[^a-z0-9_]")
 #: writes its replicates as ``sample_9α`` and ``sample_9β`` names two samples,
 #: and an ASCII-only set deletes both suffixes and merges the pair. The signs
 #: in :data:`IDENTITY_SIGNS` and the hyphen survive for the same reason.
-NON_IDENTIFIER = re.compile(rf"[^\w{re.escape(IDENTITY_SIGNS)}-]")
+NON_IDENTIFIER = re.compile(
+    rf"[^\w{re.escape(IDENTITY_SIGNS)}{re.escape(HYPHENS)}]"
+)
 
 
 def prepare(name: str) -> str:

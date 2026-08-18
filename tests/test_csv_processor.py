@@ -908,3 +908,28 @@ def test_two_groups_that_propose_one_name_are_refused_by_apply(tmp_path):
     assert mapping.collisions() == {"samplei1": [1, 2]}
     with pytest.raises(ValueError, match="more than one group"):
         apply_mapping(mapping, output_path=tmp_path / "out.csv")
+
+
+def test_a_mapping_read_from_a_file_remembers_where_it_came_from(tmp_path):
+    """`apply` must refuse to write over the decisions even when the caller
+    passes no path of its own, which a library caller has no way to do."""
+    from samplify import mapping as mapping_module
+
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    path = tmp_path / "mapping.json"
+    mapping = _accepted(source)
+    mapping_module.write(mapping, path)
+
+    restored = mapping_module.read(path)
+    assert restored.source_path == str(path)
+    assert "source_path" not in restored.to_dict()
+
+    before = path.read_text()
+    with pytest.raises(ValueError, match="the mapping file"):
+        apply_mapping(restored, output_path=path)
+    assert path.read_text() == before
+
+    # The ordinary path is untouched.
+    apply_mapping(restored, output_path=tmp_path / "clean.csv")
+    assert (tmp_path / "clean.csv").exists()

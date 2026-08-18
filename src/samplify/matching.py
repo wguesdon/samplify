@@ -123,7 +123,7 @@ MAX_VARIANT_LETTERS = 2
 #: The characters that identify a sample where they stand. A hyphen is here
 #: because :func:`samplify.rules.prepare` has already replaced every hyphen
 #: that separates two tokens, so any hyphen left is a sign.
-_SIGN_CHARACTERS = frozenset(rules.IDENTITY_SIGNS + "-")
+_SIGN_CHARACTERS = frozenset(rules.IDENTITY_SIGNS + rules.HYPHENS)
 
 
 def clear_name_caches() -> None:

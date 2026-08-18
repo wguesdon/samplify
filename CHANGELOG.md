@@ -13,6 +13,30 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.12.0] - 2026-08-19
+
+A review with no list of past findings, written to check that the exclusions
+given to the earlier passes hid nothing, found two defects that merge two
+different samples. They had been hidden.
+
+### Fixed
+
+- A sign identifies a sample in every typeface. Only the ASCII prime and the
+  ASCII hyphen were kept, so a name that a word processor or a journal wrote
+  lost its sign: `WT2-1′` merged with `WT2-1` and `CD4−_donor1` merged with
+  `CD4_donor1`. `rules.IDENTITY_SIGNS` now holds the prime, the double prime,
+  the right single quotation mark, the plus-minus sign and the fullwidth plus,
+  and `rules.HYPHENS` holds the nine characters that a keyboard, a word
+  processor or a journal uses for a hyphen or a minus. Each of the nine
+  separates two tokens where the ASCII hyphen would, and identifies a sample
+  everywhere else.
+- A mapping file read from disk remembers where it came from, and `apply`
+  refuses to write an output over it. The guard needed the caller to name the
+  file, which the command line does and a library caller has no way to do, so
+  `apply_mapping(read("mapping.json"), output_path="mapping.json")` destroyed
+  the decisions. The path is never written into the document, because it
+  describes the copy and not the mapping.
+
 ## [0.11.5] - 2026-08-19
 
 ### Changed

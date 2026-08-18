@@ -292,6 +292,13 @@ class MappingFile:
     canonical_pattern: str = ""
     schema_version: int = SCHEMA_VERSION
 
+    #: Where this file was read from, when it was read from a file. It is set
+    #: by :func:`read` and it is never written into the document, because it
+    #: describes the copy and not the mapping. `apply` needs it, so that it
+    #: refuses to write an output over the file that holds the decisions even
+    #: when the caller passes no path of its own.
+    source_path: str | None = field(default=None, compare=False, repr=False)
+
     # ── Queries ────────────────────────────────────────────────────────────
 
     def pending(self) -> list[Group]:
@@ -576,4 +583,7 @@ def read(path: str | Path) -> MappingFile:
             data = json.load(fh)
     except json.JSONDecodeError as exc:
         raise ValueError(f"{path} is not valid JSON: {exc}") from exc
-    return MappingFile.from_dict(data)
+
+    mapping = MappingFile.from_dict(data)
+    mapping.source_path = str(path)
+    return mapping
