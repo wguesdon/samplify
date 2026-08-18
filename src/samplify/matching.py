@@ -21,6 +21,7 @@ never grouped, however similar the letters look.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from functools import lru_cache
 
@@ -49,6 +50,11 @@ METHODS = OFFLINE_METHODS + ("llm", "auto")
 #: keystroke, and Damerau-Levenshtein is the measure that agrees.
 DEFAULT_DISTANCE = "damerau"
 
+#: A run of decimal digits. ``\d`` matches a decimal digit in every script, and
+#: :func:`int` reads exactly those. Every test for a number in this module uses
+#: ``str.isdecimal`` for the same reason. ``str.isdigit`` also accepts a
+#: superscript such as ``²``, which :func:`int` then refuses, and a name holding
+#: one crashed the near-miss search.
 _DIGIT_RUN = re.compile(r"\d+")
 
 #: The shortest letter skeleton for which one inserted, deleted or swapped
@@ -341,12 +347,12 @@ def digit_signature(name: str) -> tuple[str, ...]:
     index = 0
 
     while index < len(lowered):
-        if not lowered[index].isdigit():
+        if not lowered[index].isdecimal():
             index += 1
             continue
 
         start = index
-        while index < len(lowered) and lowered[index].isdigit():
+        while index < len(lowered) and lowered[index].isdecimal():
             index += 1
         digits = lowered[start:index]
 
@@ -358,7 +364,7 @@ def digit_signature(name: str) -> tuple[str, ...]:
         # A letter run with a digit behind it belongs to the next component of
         # the name. Read the letters again from the start of the run, so that
         # the number behind them opens its own component.
-        if index < len(lowered) and lowered[index].isdigit():
+        if index < len(lowered) and lowered[index].isdecimal():
             suffix = ""
             index = letters_start
 
@@ -372,9 +378,43 @@ def digit_signature(name: str) -> tuple[str, ...]:
     # names in the reference corpus that hold a sign, exactly one pair differs
     # only in the order of its characters, and that pair moved a number rather
     # than a sign and is one sample written two ways.
-    signature.extend(c for c in lowered if c in _SIGN_CHARACTERS)
+    # A sign joins the signature, and so does any other character that the rules
+    # can neither read nor safely drop. See :func:`_identifies_but_cannot_be_read`.
+    signature.extend(
+        character for character in lowered
+        if character in _SIGN_CHARACTERS or _identifies_but_cannot_be_read(character)
+    )
 
     return tuple(signature)
+
+
+def _identifies_but_cannot_be_read(character: str) -> bool:
+    """Report whether one character identifies a sample and defeats every rule.
+
+    Two shapes reach this function, and normalisation would delete both.
+
+    A superscript such as ``²`` is alphanumeric, it is neither a letter nor a
+    decimal digit, and :func:`int` cannot read it. A combining mark such as the
+    dot above is what ``İ`` becomes when it is lower-cased, and dropping it
+    makes ``sampleİ1`` the same name as ``sampleI1``. Two names that differ by a
+    Greek letter already stay apart, so two names that differ by a mark have to
+    as well.
+
+    Neither shape appears in any of the 36073 names of the reference corpus, so
+    keeping them costs nothing there. Each one keeps two names apart rather than
+    guessing which of them the rules meant to delete.
+
+    Args:
+        character: One character of a prepared name.
+
+    Returns:
+        True when the character belongs in the identity signature.
+    """
+    if character.isalpha() or character.isdecimal():
+        return False
+    if character.isalnum():
+        return True
+    return unicodedata.category(character).startswith("M")
 
 
 @lru_cache(maxsize=NAME_CACHE_SIZE)
@@ -428,7 +468,7 @@ def rule_normalise(name: str) -> str:
     # of all.
     joined_tokens: list[str] = []
     for token in tokens:
-        if token.isdigit() and joined_tokens and not joined_tokens[-1][-1].isdigit():
+        if token.isdecimal() and joined_tokens and not joined_tokens[-1][-1].isdecimal():
             joined_tokens[-1] = joined_tokens[-1] + token
         else:
             joined_tokens.append(token)
@@ -456,7 +496,7 @@ def _expand_token(token: str) -> str:
 
     # Not an abbreviation. Strip zero-padding from a bare number so that
     # sample_01 and sample_1 agree.
-    if token.isdigit():
+    if token.isdecimal():
         return token.lstrip("0") or "0"
 
     # A word followed by a number, such as "sample007".
@@ -872,7 +912,7 @@ def _number_series(names: list[str]) -> dict[tuple[str, int], set[int]]:
     for name in names:
         skeleton = letter_skeleton(name)
         for index, component in enumerate(digit_signature(name)):
-            if component.isdigit():
+            if component.isdecimal():
                 series.setdefault((skeleton, index), set()).add(int(component))
     return series
 
@@ -909,7 +949,7 @@ def _slip_is_reportable(
     Returns:
         True when the pair is worth reporting to a person.
     """
-    if not (shorter.isdigit() and longer.isdigit()):
+    if not (shorter.isdecimal() and longer.isdecimal()):
         return True
 
     observed = series.get((skeleton, index), set())

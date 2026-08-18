@@ -13,6 +13,29 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.6] - 2026-08-18
+
+A sixth review found one defect, down from four.
+
+### Fixed
+
+- A character that the rules can neither read nor safely drop now joins the
+  identity signature. A superscript such as `²` is alphanumeric and is neither
+  a letter nor a decimal digit, and `int` refuses it, which crashed the
+  near-miss search. A combining mark is what `İ` becomes when it is
+  lower-cased, and dropping it made `sampleİ1` the same name as `sampleI1`. Two
+  names that differ by a Greek letter already stayed apart, so these had to as
+  well. Neither shape appears in any of the 36073 names of the reference
+  corpus.
+- Every test for a number reads `str.isdecimal` and not `str.isdigit`.
+  `'²'.isdigit()` is True and `int('²')` raises, and that pair of facts is what
+  crashed the search.
+- `Group.resolved` refuses a status it does not know and refuses to rename a
+  member to an empty name. Reading a mapping file checks each field, and a
+  caller that builds a `Group` in Python does not go through that check, so a
+  group with the status `corrupt` and an empty final name renamed a sample to
+  nothing.
+
 ## [0.9.5] - 2026-08-18
 
 ### Changed

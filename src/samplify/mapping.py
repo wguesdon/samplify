@@ -93,10 +93,23 @@ class Group:
         Raises:
             ValueError: If the group is still awaiting a decision.
         """
+        # Reading a mapping file checks each field, and a caller that builds a
+        # Group in Python does not go through that check. This is the one place
+        # where a decision becomes a new name, so it checks again.
+        if self.status not in STATUSES:
+            raise ValueError(
+                f"Group {self.id} has status {self.status!r}, which is not one "
+                f"of {STATUSES}."
+            )
         if self.status == STATUS_PROPOSED:
             raise ValueError(f"Group {self.id} is still proposed and has no decision.")
         if self.status == STATUS_REJECTED:
             return {member: member for member in self.members}
+        if not isinstance(self.final, str) or not self.final.strip():
+            raise ValueError(
+                f"Group {self.id} would rename every member to {self.final!r}. "
+                f"A canonical name must be a string that holds a character."
+            )
         return {member: self.final for member in self.members}
 
     def to_dict(self) -> dict[str, Any]:

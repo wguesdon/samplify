@@ -357,3 +357,18 @@ def test_a_group_id_given_as_text_is_read():
          "status": STATUS_ACCEPTED}
     )
     assert group.id == 3
+
+
+@pytest.mark.parametrize("status", ["corrupt", "", None, "ACCEPTED"])
+def test_resolved_refuses_a_status_it_does_not_know(status):
+    """Reading a file checks each field, and building a Group in Python does not."""
+    group = Group(id=1, members=["a_1"], proposed="a1", final="a1", status=status)
+    with pytest.raises(ValueError, match="which is not one of"):
+        group.resolved()
+
+
+@pytest.mark.parametrize("final", ["", "   ", None, 7])
+def test_resolved_refuses_to_rename_a_member_to_nothing(final):
+    group = Group(id=1, members=["a_1"], proposed="a1", final=final, status=STATUS_ACCEPTED)
+    with pytest.raises(ValueError, match="would rename every member"):
+        group.resolved()

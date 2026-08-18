@@ -747,3 +747,50 @@ def test_a_chain_of_one_edit_steps_may_span_two_edits():
         matching.letter_skeleton(ends[0]), matching.letter_skeleton(ends[1])
     ) == 2
     assert matching.group_names(ends, method="damerau") == [[ends[1]], [ends[0]]]
+
+
+# ── A character that int cannot read ───────────────────────────────────────
+
+
+def test_a_superscript_does_not_crash_the_near_miss_search():
+    """`'²'.isdigit()` is True and `int('²')` raises.
+
+    Every test for a number in the module now uses `str.isdecimal`, which is
+    exactly the set that `int` reads.
+    """
+    assert "²".isdigit() and not "²".isdecimal()
+    assert matching.find_near_misses(["sample²_1", "sample_1"]) == []
+    assert matching.digit_signature("sample²_1") == ("1", "²")
+
+
+def test_a_character_that_is_neither_a_letter_nor_a_digit_identifies_a_sample():
+    """It survives normalisation, so it may not be read as formatting.
+
+    No name of the 36073 in the reference corpus holds one, so this costs
+    nothing there and it keeps two names apart rather than guessing.
+    """
+    assert matching.group_names(["sample²_1", "sample_1"], method="damerau") == [
+        ["sample_1"],
+        ["sample²_1"],
+    ]
+
+
+def test_a_combining_mark_identifies_a_sample():
+    """`İ` lower-cases to `i` and a combining dot, and dropping the dot made
+    `sampleİ1` the same name as `sampleI1`. Two names that differ by a Greek
+    letter already stay apart, so these have to as well."""
+    assert "İ".lower() == "i̇"
+    assert matching.digit_signature("sampleİ1") == ("1", "̇")
+    assert matching.group_names(["sampleI1", "sampleİ1"], method="damerau") == [
+        ["sampleI1"],
+        ["sampleİ1"],
+    ]
+
+
+def test_the_three_name_readers_are_the_cached_ones():
+    """A helper was once inserted between letter_skeleton and its decorator,
+    which moved the cache onto the helper and left the reader uncached."""
+    for reader in (matching.digit_signature, matching.letter_skeleton,
+                   matching.rule_normalise):
+        assert hasattr(reader, "cache_clear"), reader.__name__
+    assert not hasattr(matching._identifies_but_cannot_be_read, "cache_clear")
