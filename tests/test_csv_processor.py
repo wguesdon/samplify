@@ -762,3 +762,27 @@ def test_a_real_true_still_lets_a_collision_through(tmp_path):
     )
     _, log = apply_mapping(mapping)
     assert log["collisions"] == {"one": [1, 2]}
+
+
+def test_a_file_that_excel_wrote_is_read(tmp_path):
+    """Excel writes a byte order mark and CRLF line endings."""
+    source = tmp_path / "excel.csv"
+    source.write_bytes("﻿sample_id,value\r\nS1_B1,1\r\ns1-b1,2\r\n".encode("utf-8"))
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    assert [g.members for g in mapping.groups] == [["S1_B1", "s1-b1"]]
+
+
+def test_a_duplicate_column_is_refused_behind_a_byte_order_mark(tmp_path):
+    """pandas strips the mark and the default encoding does not.
+
+    The two readers disagreed about the first column name, so the duplicate
+    check read `\\ufeffsample_id`, counted one `sample_id`, and passed a file
+    that holds the column twice. pandas then renamed the second one and half
+    the names were invisible.
+    """
+    source = tmp_path / "excel_dup.csv"
+    source.write_bytes("﻿sample_id,sample_id\r\nA_1,B_1\r\n".encode("utf-8"))
+
+    with pytest.raises(ValueError, match="appears 2 times"):
+        propose_csv(source, "sample_id", method="damerau")

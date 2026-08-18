@@ -42,8 +42,13 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
     Raises:
         ValueError: If the column is absent, or if the header holds it twice.
     """
+    # utf-8-sig, because pandas strips a byte order mark and the default
+    # encoding does not. A file that Excel wrote starts with one, and the two
+    # readers then disagreed about the first column name: this one saw
+    # "\ufeffsample_id" and pandas saw "sample_id". The duplicate check below
+    # read the wrong name and passed a file that holds the column twice.
     header: list[str] = []
-    with open(path, newline="") as fh:
+    with open(path, newline="", encoding="utf-8-sig") as fh:
         header = next(csv.reader(fh), [])
     if header.count(column) > 1:
         raise ValueError(

@@ -13,6 +13,18 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.7] - 2026-08-18
+
+### Fixed
+
+- A file that Excel wrote is read the same way by both of the readers that
+  samplify uses on its header. Excel starts a CSV with a byte order mark,
+  pandas strips it and the default encoding does not, so the duplicate-column
+  check saw `\ufeffsample_id` where pandas saw `sample_id`. It counted one
+  `sample_id` in a file that holds two, pandas renamed the second one, and half
+  the names were invisible. That is the defect that 0.4.0 repaired, reachable
+  again through a byte order mark.
+
 ## [0.9.6] - 2026-08-18
 
 A sixth review found one defect, down from four.
