@@ -303,6 +303,12 @@ def _write_plot(result: MappingFile, path: str, title: str | None = None, dpi: i
         # the fact that the proposal itself had succeeded.
         _print_error(f"The figure could not be written to {path}: {exc}")
         return 1
+    except ValueError as exc:
+        # matplotlib decides the format from the extension of the path, and it
+        # raises for one it cannot write. `-o qc.json` reached the user as a
+        # traceback.
+        _print_error(f"The figure could not be written to {path}: {exc}")
+        return 1
 
     console.print(f"[green]QC figure written to {path}[/green]")
     return 0
@@ -310,6 +316,15 @@ def _write_plot(result: MappingFile, path: str, title: str | None = None, dpi: i
 
 def _run_plot(args: argparse.Namespace) -> int:
     """Draw the quality control figure for an existing mapping file."""
+    # The figure goes somewhere else. Every other command already refuses to
+    # write over its own input, and this one is the last of them.
+    if Path(args.output).resolve() == Path(args.mapping).resolve():
+        _print_error(
+            f"--output points at {args.mapping}, which is the input. samplify "
+            f"writes no output over its own input."
+        )
+        return 1
+
     try:
         result = mapping_module.read(args.mapping)
     except (ValueError, FileNotFoundError) as exc:

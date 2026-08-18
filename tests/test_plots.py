@@ -138,3 +138,32 @@ def test_a_figure_that_cannot_be_written_gives_an_error_not_a_traceback(tmp_path
 
     assert code == 1
     assert "could not be written" in capsys.readouterr().out
+
+
+def test_plot_writes_no_figure_over_its_own_mapping(tmp_path, capsys):
+    """Every command refuses to write over its own input, and this is the last."""
+    from samplify import mapping as mapping_module
+
+    path = tmp_path / "mapping.json"
+    mapping_module.write(
+        propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau"), path
+    )
+    before = path.read_text()
+
+    assert cli.main(["plot", str(path), "-o", str(path)]) == 1
+    assert "which is the input" in " ".join(capsys.readouterr().out.split())
+    assert path.read_text() == before
+
+
+def test_a_format_matplotlib_cannot_write_gives_an_error(tmp_path, capsys):
+    """matplotlib decides the format from the extension and raises for one it
+    cannot write, and `-o qc.json` reached the user as a traceback."""
+    from samplify import mapping as mapping_module
+
+    path = tmp_path / "mapping.json"
+    mapping_module.write(
+        propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau"), path
+    )
+
+    assert cli.main(["plot", str(path), "-o", str(tmp_path / "qc.json")]) == 1
+    assert "could not be written" in " ".join(capsys.readouterr().out.split())

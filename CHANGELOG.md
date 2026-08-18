@@ -13,6 +13,24 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.3] - 2026-08-18
+
+Found by reading the code rather than by a review. Two commands were guarded
+against writing over their own input and a third was not, so the class is
+closed by auditing every path that writes a file.
+
+### Fixed
+
+- `samplify plot` refuses an output that points at the mapping file it reads.
+- `samplify plot` reports a format that matplotlib cannot write instead of
+  raising a traceback. matplotlib decides the format from the extension of the
+  path, and `-o qc.json` reached the user as a stack trace.
+
+Every command now refuses to write over its own input: `propose` for its
+mapping file and its figure, `apply` for its output CSV and its two logs, and
+`plot` for its figure. `review` writes the mapping file it read, and that is
+what the command is for.
+
 ## [0.10.2] - 2026-08-18
 
 A tenth review found two defects.
