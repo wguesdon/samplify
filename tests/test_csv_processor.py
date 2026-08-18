@@ -786,3 +786,35 @@ def test_a_duplicate_column_is_refused_behind_a_byte_order_mark(tmp_path):
 
     with pytest.raises(ValueError, match="appears 2 times"):
         propose_csv(source, "sample_id", method="damerau")
+
+
+def test_the_change_log_describes_what_the_output_did(tmp_path):
+    """The CSV log is a record a person reads instead of the whole output.
+
+    Every row of it has to match the output, and every count in it has to match
+    the input, or the record is worse than none.
+    """
+    import csv as csv_module
+
+    source = EXAMPLE_DIR / "cohort_messy.csv"
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+
+    output = tmp_path / "clean.csv"
+    log_path = tmp_path / "changes.csv"
+    _, log = apply_mapping(mapping, output_path=output, csv_log_path=log_path)
+
+    written = pd.read_csv(output, dtype=str, keep_default_na=False)
+    original = pd.read_csv(source, dtype=str, keep_default_na=False)
+    changes = {row["original"]: row for row in csv_module.DictReader(open(log_path))}
+
+    for name, canonical in zip(written["sample_id"], written["sample_id_canonical"]):
+        assert name in changes, name
+        assert changes[name]["canonical"] == canonical
+
+    counts = original["sample_id"].value_counts().to_dict()
+    for name, row in changes.items():
+        assert int(row["occurrences"]) == counts[name], name
+
+    rows_changed = int((written["sample_id"] != written["sample_id_canonical"]).sum())
+    assert log["summary"]["rows_changed"] == rows_changed
