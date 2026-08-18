@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from samplify import mapping as mapping_module
+from samplify import matching
 from samplify.csv_processor import apply_mapping, diagnose, harmonize_csv, propose, propose_csv
 from samplify.mapping import MappingFile
 
@@ -872,3 +873,38 @@ def test_apply_writes_no_output_over_the_mapping_file(tmp_path, option):
                       **{option: mapping_file})
 
     assert mapping_file.read_text() == before
+
+
+@pytest.mark.parametrize("method", ["llm", "auto"])
+def test_the_model_paths_never_drop_a_name(method):
+    """Two clusters can normalise to one representative.
+
+    A plain dict then kept one of them and dropped the other, so a sample
+    disappeared from the file a person reviews. `sampleI1` and `sampleİ1` are
+    two identities that share the representative `samplei1`.
+    """
+    names = ["sampleI1", "sampleİ1", "patient1_batch1", "patietn1_batch1"]
+
+    with patch("samplify.csv_processor.harmonize", return_value=_answer({})):
+        result = propose(names, method=method, api_key="test")
+
+    kept = sorted(member for group in result.groups for member in group.members)
+    assert kept == sorted(names)
+    for group in result.groups:
+        signatures = {matching.digit_signature(m) for m in group.members}
+        assert len(signatures) == 1, group.members
+
+
+def test_two_groups_that_propose_one_name_are_refused_by_apply(tmp_path):
+    """The two identities keep the same canonical name, and apply says so
+    rather than joining them."""
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nsampleI1\nsampleİ1\n")
+
+    with patch("samplify.csv_processor.harmonize", return_value=_answer({})):
+        mapping = propose_csv(source, "sample_id", method="auto", api_key="test")
+    mapping.accept_all()
+
+    assert mapping.collisions() == {"samplei1": [1, 2]}
+    with pytest.raises(ValueError, match="more than one group"):
+        apply_mapping(mapping, output_path=tmp_path / "out.csv")

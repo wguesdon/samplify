@@ -13,6 +13,27 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.11.0] - 2026-08-18
+
+The sixteenth review reported that it found no major defect. Its one finding
+changes which names reach a group, so this is a minor version.
+
+### Fixed
+
+- The `auto` backend keeps every offline cluster. Two clusters can normalise to
+  one representative, and a plain dictionary then kept one of them and dropped
+  the other, so a sample disappeared from the file a person reviews.
+  `sampleI1` and `sampleİ1` are two identities that share the representative
+  `samplei1`.
+- Both model backends split the members they assemble, and not only the
+  representatives they were shown. One representative can carry members of more
+  than one identity, and `_split_by_identity` now takes those apart by digit
+  signature and by the substitution rule.
+
+Two names that keep the same canonical name after all of that are two groups
+proposing one name, and `apply` refuses that in a mapping no person reviewed.
+The tool asks rather than joining them.
+
 ## [0.10.9] - 2026-08-18
 
 Found by sweeping every command with every malformed input myself.

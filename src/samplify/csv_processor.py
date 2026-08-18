@@ -287,7 +287,14 @@ def propose(
             representatives = [
                 matching.canonical_for_group(c, occurrences, corpus) for c in offline
             ]
-            rep_to_cluster = dict(zip(representatives, offline))
+            # Two clusters can normalise to one representative, and a plain
+            # dict then kept one of them and dropped the other, so a sample
+            # disappeared from the file a person reviews. The members are
+            # gathered under the shared representative instead, and the
+            # identity split below takes them apart again.
+            rep_to_cluster: dict[str, list[str]] = {}
+            for representative, cluster in zip(representatives, offline):
+                rep_to_cluster.setdefault(representative, []).extend(cluster)
             result = harmonize(
                 sorted(rep_to_cluster),
                 api_key=api_key,
@@ -313,6 +320,30 @@ def propose(
         near_misses=near_misses,
         canonical_pattern=canonical_pattern,
     )
+
+
+def _split_by_identity(members: list[str]) -> list[list[str]]:
+    """Split a list of names so that no group mixes two identities.
+
+    A group holds one digit signature and no forbidden pair. The model paths
+    assemble their groups from representatives, and a representative can carry
+    members of more than one identity, so the assembled list is split again.
+
+    Args:
+        members: The names of one assembled group.
+
+    Returns:
+        One list per identity, each sorted, in a deterministic order.
+    """
+    by_signature: dict[tuple[str, ...], list[str]] = {}
+    for member in members:
+        by_signature.setdefault(matching.digit_signature(member), []).append(member)
+
+    return [
+        group
+        for _, same_identity in sorted(by_signature.items())
+        for group in matching.split_on_a_substitution(sorted(same_identity))
+    ]
 
 
 def _cluster_by_canonical(
@@ -403,17 +434,27 @@ def _merge_clusters_by_model(
             # The substitution rule reads the representatives, because those
             # are the names the model was shown and the names it joined.
             for kept_reps in matching.split_on_a_substitution(sorted(safe_reps)):
-                members = sorted(m for rep in kept_reps for m in rep_to_cluster[rep])
-                clusters.append(members)
-                # The name belongs to one digit signature and one set of
-                # letters. Giving it to the other halves of a refused merge
-                # would rename p112 to p111 at the apply step, which is the
-                # merge the split just prevented.
-                fits = signature == canonical_signature and (
-                    len(safe_reps) == len(kept_reps)
-                    or matching.letter_skeleton(kept_reps[0]) == canonical_skeleton
-                )
-                canonical[members[0]] = canonical_name if fits else kept_reps[0]
+                gathered = sorted(m for rep in kept_reps for m in rep_to_cluster[rep])
+                # One representative can carry members of more than one
+                # identity, so the members are split as well as the
+                # representatives.
+                for members in _split_by_identity(gathered):
+                    clusters.append(members)
+                    # The name belongs to one digit signature and one set of
+                    # letters. Giving it to the other halves of a refused merge
+                    # would rename p112 to p111 at the apply step, which is the
+                    # merge the split just prevented.
+                    fits = (
+                        signature == canonical_signature
+                        and matching.digit_signature(members[0]) == canonical_signature
+                        and (
+                            len(safe_reps) == len(kept_reps)
+                            or matching.letter_skeleton(kept_reps[0]) == canonical_skeleton
+                        )
+                    )
+                    canonical[members[0]] = canonical_name if fits else (
+                        matching.rule_normalise(members[0]) or members[0]
+                    )
 
     return clusters, canonical
 
