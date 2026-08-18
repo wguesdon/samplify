@@ -232,3 +232,24 @@ def test_no_two_outputs_of_one_command_name_one_file(workspace, command, argv, o
             arguments += ["--output", str(workspace["root"] / "spare.json")]
 
         assert cli.main(arguments) == 1, (command, first, second)
+
+
+def test_a_command_that_fails_leaves_no_file_behind(workspace):
+    """A failure writes nothing, not even a partial file or a temporary one."""
+    root: Path = workspace["root"]
+    before = sorted(path.name for path in root.iterdir())
+
+    failures = [
+        ["apply", str(workspace["mapping"]), "--output", str(root / "x.csv"),
+         "--json-log", str(root / "x.csv")],
+        ["propose", str(workspace["data"]), "-c", "sample_id", "-M", "damerau",
+         "--yes", "-o", str(workspace["data"])],
+        ["plot", str(workspace["mapping"]), "-o", str(workspace["mapping"])],
+        ["review", str(root / "absent.json")],
+        ["apply", str(workspace["mapping"]), "--output",
+         str(root / "absent" / "x.csv")],
+    ]
+    for argv in failures:
+        assert cli.main(argv) == 1, argv
+
+    assert sorted(path.name for path in root.iterdir()) == before
