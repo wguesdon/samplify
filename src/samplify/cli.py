@@ -511,10 +511,18 @@ def _run_names(args: argparse.Namespace) -> int:
     names: list[str] = list(args.names)
     if args.file:
         try:
-            with open(args.file) as fh:
+            # utf-8-sig, as the CSV reader uses, so a file that Excel wrote does
+            # not carry a byte order mark into its first name.
+            with open(args.file, encoding="utf-8-sig") as fh:
                 names.extend(line.strip() for line in fh if line.strip())
         except FileNotFoundError:
             _print_error(f"File not found: {args.file}")
+            return 1
+        except (OSError, ValueError) as exc:
+            # A file in another encoding, or one this user may not read. The
+            # decode happens while the lines are read, so it escaped the block
+            # above and reached the user as a traceback.
+            _print_error(f"{args.file} could not be read: {exc}")
             return 1
 
     if not names:

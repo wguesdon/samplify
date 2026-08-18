@@ -211,3 +211,29 @@ def test_propose_writes_no_output_over_its_own_input(tmp_path, option, capsys):
     assert code == 1
     assert "which is the input" in " ".join(capsys.readouterr().out.split())
     assert source.read_text() == before
+
+
+def test_a_names_file_in_another_encoding_gives_an_error(tmp_path, capsys):
+    """The decode happens while the lines are read, so it escaped the block
+    that catches a missing file and reached the user as a traceback."""
+    path = tmp_path / "names.txt"
+    path.write_bytes("x\nsampl\xe9_1\n".encode("latin-1"))
+
+    assert cli.main(["names", "--file", str(path), "-M", "damerau"]) == 1
+    assert "could not be read" in " ".join(capsys.readouterr().out.split())
+
+
+def test_a_names_file_that_excel_wrote_is_read(tmp_path, capsys):
+    """utf-8-sig, as the CSV reader uses, so no byte order mark reaches a name."""
+    path = tmp_path / "names.txt"
+    path.write_bytes("﻿S1_B1\ns1-b1\n".encode("utf-8"))
+
+    assert cli.main(["names", "--file", str(path), "-M", "damerau", "--json"]) == 0
+    printed = capsys.readouterr().out
+    assert '"S1_B1"' in printed
+    assert "﻿" not in printed
+
+
+def test_a_names_file_that_is_missing_still_says_so(tmp_path, capsys):
+    assert cli.main(["names", "--file", str(tmp_path / "absent.txt")]) == 1
+    assert "File not found" in " ".join(capsys.readouterr().out.split())

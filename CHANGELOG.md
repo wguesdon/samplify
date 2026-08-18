@@ -13,6 +13,18 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.9] - 2026-08-18
+
+Found by sweeping every command with every malformed input myself.
+
+### Fixed
+
+- `samplify names --file` reports a file it cannot read instead of raising a
+  traceback. The decode happens while the lines are read, so a file in another
+  encoding escaped the block that catches a missing file. The file is read as
+  `utf-8-sig` as well, so a list that Excel wrote does not carry a byte order
+  mark into its first name.
+
 ## [0.10.8] - 2026-08-18
 
 The fifteenth review reported that no finding is major. Its one finding is
