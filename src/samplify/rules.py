@@ -141,6 +141,18 @@ ABBREVIATIONS: tuple[Abbreviation, ...] = (
 )
 
 
+#: Every alias as a compiled pattern, built one time at import, in the order of
+#: :data:`ABBREVIATIONS`. :func:`samplify.matching._expand_token` runs for every
+#: token of every name of every comparison. Building the pattern string there
+#: called :func:`re.escape` 20 million times on one real study, which was 18 of
+#: the 50 seconds that the proposal took.
+COMPILED_ALIASES: tuple[tuple[re.Pattern[str], "Abbreviation", str], ...] = tuple(
+    (re.compile(abbreviation.alias_regex(alias)), abbreviation, alias)
+    for abbreviation in ABBREVIATIONS
+    for alias in abbreviation.aliases
+)
+
+
 def split_tokens(name: str) -> list[str]:
     """Split a sample name into lower-case tokens on any delimiter.
 
@@ -168,14 +180,12 @@ def detect_abbreviations(names: list[str]) -> list[str]:
     seen: set[str] = set()
     tokens = {token for name in names for token in split_tokens(name)}
 
-    for abbrev in ABBREVIATIONS:
-        for alias in abbrev.aliases:
-            pattern = abbrev.alias_regex(alias)
-            if any(re.fullmatch(pattern, token) for token in tokens):
-                label = abbrev.describe(alias)
-                if label not in seen:
-                    found.append(label)
-                    seen.add(label)
+    for pattern, abbreviation, alias in COMPILED_ALIASES:
+        if any(pattern.fullmatch(token) for token in tokens):
+            label = abbreviation.describe(alias)
+            if label not in seen:
+                found.append(label)
+                seen.add(label)
     return found
 
 

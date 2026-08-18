@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from functools import lru_cache
 
 from . import rules
 
@@ -92,6 +93,19 @@ _SIGN_CHARACTERS = frozenset(rules.IDENTITY_SIGNS + "-")
 
 
 # ── String distances ───────────────────────────────────────────────────────
+
+
+#: The size of the cache on the three functions that read a raw name. Each one
+#: is a pure function of one string, and each one runs many times for the same
+#: name: `rule_normalise` ran 86625 times for the 2267 unique names of one real
+#: study, because every comparison reads both of its names again. The cache
+#: holds far more names than a metadata table carries and it never grows past
+#: this bound.
+#:
+#: A caller that changes a rule at run time, which a test may do, has to call
+#: ``rule_normalise.cache_clear()`` and the same on the other two. The rules do
+#: not change during a run of the command line.
+NAME_CACHE_SIZE = 100_000
 
 
 def hamming_distance(a: str, b: str) -> int | None:
@@ -264,6 +278,7 @@ def similarity(a: str, b: str, method: str = DEFAULT_DISTANCE) -> float:
 # ── Identity and normalisation ─────────────────────────────────────────────
 
 
+@lru_cache(maxsize=NAME_CACHE_SIZE)
 def digit_signature(name: str) -> tuple[str, ...]:
     """Extract the identity of a name, which is its sequence of numbers.
 
@@ -333,6 +348,7 @@ def digit_signature(name: str) -> tuple[str, ...]:
     return tuple(signature)
 
 
+@lru_cache(maxsize=NAME_CACHE_SIZE)
 def letter_skeleton(name: str) -> str:
     """Reduce a name to the lower-case letters it contains.
 
@@ -353,6 +369,7 @@ def letter_skeleton(name: str) -> str:
     return "".join(c for c in name.lower() if c.isalpha())
 
 
+@lru_cache(maxsize=NAME_CACHE_SIZE)
 def rule_normalise(name: str) -> str:
     """Apply the character-level rules to one name, with no model call.
 
@@ -400,15 +417,13 @@ def _expand_token(token: str) -> str:
     Returns:
         The expanded token, or the token unchanged when no rule applies.
     """
-    for abbrev in rules.ABBREVIATIONS:
-        for alias in abbrev.aliases:
-            match = re.fullmatch(abbrev.alias_regex(alias), token)
-            if match is None:
-                continue
-            number = _DIGIT_RUN.search(token)
-            if number is None:
-                return abbrev.canonical
-            return f"{abbrev.canonical}{number.group().lstrip('0') or '0'}"
+    for pattern, abbreviation, _ in rules.COMPILED_ALIASES:
+        if pattern.fullmatch(token) is None:
+            continue
+        number = _DIGIT_RUN.search(token)
+        if number is None:
+            return abbreviation.canonical
+        return f"{abbreviation.canonical}{number.group().lstrip('0') or '0'}"
 
     # Not an abbreviation. Strip zero-padding from a bare number so that
     # sample_01 and sample_1 agree.

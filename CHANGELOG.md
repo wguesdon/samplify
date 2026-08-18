@@ -13,6 +13,27 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.8.2] - 2026-08-18
+
+### Fixed
+
+- The alias patterns are compiled one time at import and not rebuilt on every
+  token. `_expand_token` runs for every token of every name of every
+  comparison, and building the pattern string there called `re.escape` 20
+  million times on one real study.
+- `digit_signature`, `letter_skeleton` and `rule_normalise` are cached. Each is
+  a pure function of one string and each ran many times for the same name,
+  because every comparison reads both of its names again. `rule_normalise` ran
+  86625 times for 2267 unique names.
+
+Neither change alters an answer. The 88 datasets of the near-miss comparison
+still agree, and the corpus still gives 32 merges.
+
+| Study and field | Unique names | 0.4.1 | 0.8.1 | 0.8.2 |
+|---|---|---|---|---|
+| PRJDB5361 `sample_title` | 2267 | 376.9 s | 7.2 s | 1.31 s |
+| PRJDB6952 `library_name` | 3243 | 2.7 s | 0.9 s | 0.52 s |
+
 ## [0.8.1] - 2026-08-18
 
 A second review of the repaired code found four defects. Three of them merged
