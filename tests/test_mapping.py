@@ -334,3 +334,26 @@ def test_a_mapping_file_that_is_not_an_object_is_refused_on_disk(tmp_path):
     path.write_text('[{"id": 1}]')
     with pytest.raises(ValueError, match="holds an object"):
         mapping_module.read(path)
+
+
+@pytest.mark.parametrize("identifier", [None, "one", [], {}])
+def test_a_group_id_that_is_not_a_number_is_refused(identifier):
+    """int(None) raises TypeError, and this class documents ValueError."""
+    document = {
+        "id": identifier,
+        "members": ["a_1"],
+        "proposed": "a1",
+        "final": "a1",
+        "status": STATUS_ACCEPTED,
+    }
+    with pytest.raises(ValueError, match="An id must be a number"):
+        Group.from_dict(document)
+
+
+def test_a_group_id_given_as_text_is_read():
+    """A number written as text is still a number, and JSON allows it."""
+    group = Group.from_dict(
+        {"id": "3", "members": ["a_1"], "proposed": "a1", "final": "a1",
+         "status": STATUS_ACCEPTED}
+    )
+    assert group.id == 3

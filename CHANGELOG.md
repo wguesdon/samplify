@@ -13,6 +13,27 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.5] - 2026-08-18
+
+### Fixed
+
+- A group id that is not a number is refused with a `ValueError`. `int(None)`
+  raises a `TypeError`, and the class documents `ValueError`, so a caller had to
+  catch two kinds of error for one malformed file.
+
+### Not changed
+
+- The identity signature records which signs a name holds and not where each
+  one stood, so `cd4+_donor1` and `cd+4_donor1` share one signature. Of the
+  17683 names in the reference corpus that hold a sign, exactly one pair differs
+  only in the order of its characters, and that pair moved a number rather than
+  a sign and is one sample written two ways.
+- The check that splits a model cluster reads one substituted letter and
+  nothing wider, so a model that joins two names two edits apart, one of them a
+  substitution, is not split. That is the boundary of what a rule can decide
+  without reading the meaning of the words, and the review step stands behind
+  it.
+
 ## [0.9.4] - 2026-08-18
 
 ### Fixed

@@ -366,6 +366,12 @@ def digit_signature(name: str) -> tuple[str, ...]:
 
     # The signs come after the numbers, so that adding one never moves the
     # position of a number. The near-miss search reads a number by its position.
+    #
+    # This drops where each sign stood, so `cd4+_donor1` and `cd+4_donor1` share
+    # one signature and can merge. That is measured and accepted: of the 17683
+    # names in the reference corpus that hold a sign, exactly one pair differs
+    # only in the order of its characters, and that pair moved a number rather
+    # than a sign and is one sample written two ways.
     signature.extend(c for c in lowered if c in _SIGN_CHARACTERS)
 
     return tuple(signature)

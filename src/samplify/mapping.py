@@ -158,8 +158,17 @@ class Group:
                     f"Group {data['id']} has the member {member!r}. A member "
                     f"must be a string that holds a character."
                 )
+        # int(None) raises a TypeError, and this class documents ValueError.
+        # Every malformed field has to answer with the same kind of error, or
+        # the caller has to catch two.
+        try:
+            identifier = int(data["id"])
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"A group has the id {data['id']!r}. An id must be a number."
+            ) from None
         return cls(
-            id=int(data["id"]),
+            id=identifier,
             members=list(data["members"]),
             proposed=str(data["proposed"]),
             final=str(data["final"]),

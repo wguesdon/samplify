@@ -154,6 +154,13 @@ numbers, samplify keeps the two apart. It does the same when two names differ
 by one substituted letter. Each of the two then keeps its own canonical name.
 The model advises, and the identity rules decide.
 
+The check that splits a model cluster reads one substituted letter and nothing
+wider. A model that joins `Primary B cells` with `Primary T celss` joins a pair
+two edits apart, one of which is the substitution, and the check does not fire.
+That is the boundary of what a rule can decide without reading the meaning of
+the words, and the review step is what stands behind it. `--yes` records
+`"reviewed": false` so that the file says no person stood there.
+
 samplify does not hold the model to the edit cap. A model that joins `ctrl_1`
 with `control_1` joins two names three edits apart, and reading that kind of
 difference is the reason the model backends exist. The cap belongs to the
@@ -497,7 +504,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 272 offline tests, no key and no server
+uv run pytest                 # 277 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
