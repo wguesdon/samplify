@@ -42,6 +42,7 @@ packages = ["src/samplify"]
 dev = [
     "pytest>=9.0.2",
     "matplotlib>=3.8",
+    "hypothesis>=6.165.10",
 ]
 
 [tool.pytest.ini_options]

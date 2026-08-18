@@ -471,14 +471,19 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 222 offline tests, no key and no server
+uv run pytest                 # 230 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
 ```
 
 The offline tests cover every backend, the guards, the near-miss rule, the figure
-and the reproducibility claim. The model itself is replaced, so they also cover
+and the reproducibility claim. `tests/test_properties.py` generates names rather
+than naming cases, and it states the three claims a person relies on when they
+accept a mapping. No group holds two digit signatures, `apply` keeps every row
+and never touches the source column, and the result never depends on the order
+of the input. Each property was run against a deliberately broken implementation
+first, so that a property that cannot fail does not sit in the suite. The model itself is replaced, so they also cover
 the request that goes to each provider and the answers that must raise an error.
 The file `example/mislabel_catalogue.csv` holds its own answer in a `true_sample`
 column. One test reads that column and checks that the 24 written names resolve

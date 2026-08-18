@@ -31,6 +31,14 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 ### Added
 
+- Property tests in `tests/test_properties.py`, with hypothesis as a dev
+  dependency. They generate names rather than name cases, and they state the
+  three claims a person relies on when they accept a mapping: no group holds
+  two digit signatures, `apply` keeps every row and never touches the source
+  column, and the result never depends on the order of the input. Each property
+  was checked against a deliberately broken implementation first, and each one
+  failed as it should. Removing the identity blocking makes the first property
+  report `SAMPLE_SAMPLE` merging with `sample0_sample`.
 - `find_letter_variants` reports each pair that one substituted letter
   separates, so a refused pair still reaches a person. The pairs join
   `near_misses` in the mapping file, next to the pairs that one digit
