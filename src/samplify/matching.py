@@ -823,6 +823,38 @@ def comparable_letters(a: str, b: str) -> tuple[str, str]:
     return letter_skeleton(a), letter_skeleton(b)
 
 
+def _one_name_gained_a_token(a: str, b: str) -> bool:
+    """Report whether one name holds every token of the other and one more.
+
+    That shape is a whole token added, which no keystroke produces.
+    `MSTO-211H PBS 6h` and `MSTO-211H_R PBS 6h` are a parental cell line and
+    the resistant line derived from it, and the words around the added token
+    made it look like one inserted letter.
+
+    A name written without delimiters is not this shape. `p1b1` holds the one
+    token ``pb`` and `p1_b1` holds ``p`` and ``b``, and neither list is inside
+    the other, so the two are compared as whole names and still merge.
+
+    Args:
+        a: The first name.
+        b: The second name.
+
+    Returns:
+        True when the shorter list of tokens is a subsequence of the longer one
+        and the two lists are of different lengths.
+    """
+    left, right = _letter_tokens(a), _letter_tokens(b)
+    if len(left) == len(right):
+        return False
+    shorter, longer = sorted((left, right), key=len)
+
+    position = 0
+    for token in longer:
+        if position < len(shorter) and shorter[position] == token:
+            position += 1
+    return position == len(shorter)
+
+
 def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     """Report whether two names in the same block belong together.
 
@@ -849,6 +881,13 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     Returns:
         True when the two names should join one group.
     """
+    # A whole token added or removed is not a slipped keystroke. `MSTO-211H`
+    # and `MSTO-211H_R` are a parental cell line and the resistant line derived
+    # from it, and the reference corpus merged four such pairs because the
+    # words around them made the added token look like one inserted letter.
+    if _one_name_gained_a_token(a, b):
+        return False
+
     # The letters that decide are the differing token when there is one, and
     # the whole skeleton otherwise. A long shared context must not license a
     # short difference.

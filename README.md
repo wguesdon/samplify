@@ -187,8 +187,17 @@ types. Normalisation deleted a sign that identifies a sample, so `OVTOKO_DOX+`
 and `OVTOKO_DOX-` became one string. A substituted letter merged
 `Primary B cells` with `Primary T cells`.
 
-Version 0.7.0 brought the count to 32 merges on that corpus, and every version
-since has held it there. Each of the 32 was read by hand and each is correct. Of the merges that later versions removed, all 30 of
+samplify proposes 26 merges on that corpus today. Each of the 26 was read by
+hand: 24 are a difference of formatting, one is a real transposition
+(`Patinet1` for `Patient1`), and one moves a replicate number from one end of
+the name to the other.
+
+Version 0.7.0 brought the count to 32 and I reported at the time that all 32
+were correct. Six of them were not, and version 0.14.0 removed them. Five were
+a whole token added, such as `MSTO-211H` against `MSTO-211H_R`, which are a
+parental cell line and the resistant line derived from it. One was
+`SM B from healthy control` against `USM B from healthy control`, which
+samplify kept apart under their short names and merged under their long ones. Of the merges that later versions removed, all 30 of
 the sign class and all 42 of the substitution class were read, and a sample of
 the 246 that the edit cap removed. Every one of them joined two different
 samples.

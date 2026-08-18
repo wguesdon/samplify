@@ -306,8 +306,20 @@ The reference corpus held one merge of this shape. samplify kept `SMB` and
 `USM B from healthy control`, which are the same two samples written out. The
 words they share made the difference look small.
 
-When the token counts differ, or more than one token differs, the whole letter
-skeleton decides, because no single token holds the difference.
+A whole token added or removed is not a difference of spelling at all, and no
+keystroke produces one. samplify refuses a pair where one name holds every
+token of the other and one more. The corpus held five such merges.
+`MSTO-211H PBS 6h` and `MSTO-211H_R PBS 6h` are a parental cell line and the
+resistant line derived from it in a study of pemetrexed resistance, and the
+words around the added token made it look like one inserted letter.
+
+A name written without delimiters is not that shape. `p1b1` holds the one token
+`pb` and `p1_b1` holds `p` and `b`, and neither list is inside the other, so
+those two are compared as whole names and still merge.
+
+When the token counts differ in any other way, or more than one token differs,
+the whole letter skeleton decides, because no single token holds the
+difference.
 
 ## The edit cap
 
@@ -566,7 +578,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 516 offline tests, no key and no server
+uv run pytest                 # 521 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

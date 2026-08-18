@@ -34,13 +34,17 @@ SURFACE = "#ffffff"
 #: proposes and ``removed`` is the number that a later version took away.
 #:
 #: 0.4.1 proposed 350 merges. The edit cap of 0.5.0 removed 246, the sign rule
-#: of 0.6.0 removed 30 and the substitution rule of 0.7.0 removed 42. The 32
-#: that remain were each read by hand and each is correct.
+#: of 0.6.0 removed 30, the substitution rule of 0.7.0 removed 42 and the token
+#: rules of 0.14.0 removed 6 more. The 26 that remain were each read by hand:
+#: 24 are a difference of formatting, one is a real transposition and one moves
+#: a replicate number. The six that 0.14.0 removed were reported as correct
+#: after 0.7.0, and they were not.
 ROWS: tuple[tuple[str, str, int, int], ...] = (
-    ("0.4.1", "before the validation", 32, 318),
-    ("0.5.0", "an edit cap of one", 32, 72),
-    ("0.6.0", "a sign identifies a sample", 32, 42),
-    ("0.7.0", "a substitution is reported, not merged", 32, 0),
+    ("0.4.1", "before the validation", 26, 324),
+    ("0.5.0", "an edit cap of one", 26, 78),
+    ("0.6.0", "a sign identifies a sample", 26, 48),
+    ("0.7.0", "a substitution is reported, not merged", 26, 6),
+    ("0.14.0", "a difference is judged by its token", 26, 0),
 )
 
 #: The gap between the two segments of a bar, in units of the x axis. At this

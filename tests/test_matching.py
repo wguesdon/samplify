@@ -1012,3 +1012,32 @@ def test_the_whole_name_decides_when_no_single_token_holds_the_difference():
         "sample", "samplebatch"
     )
     assert matching.comparable_letters("sample_A", "sample_AA") == ("a", "aa")
+
+
+@pytest.mark.parametrize(
+    "left,right,label",
+    [
+        ("MSTO-211H PBS 6h", "MSTO-211H_R PBS 6h", "a parental line and its resistant line"),
+        ("MSTO-211H Pemetrexed 6h", "MSTO-211H_R Pemetrexed 6h", "the same under treatment"),
+        ("TCC-MESO-2 PBS 6h", "TCC-MESO-2_R PBS 6h", "another pair of the same study"),
+        ("RNA_OvK_S005_Primary_0", "RNA_OvK_S005_Primary_A0", "PRJDB12395"),
+    ],
+)
+def test_a_whole_token_added_is_not_a_typing_error(left, right, label):
+    """No keystroke adds a token.
+
+    `MSTO-211H` and `MSTO-211H_R` are a parental cell line and the resistant
+    line derived from it in a study of pemetrexed resistance, and the words
+    around the added token made it look like one inserted letter.
+    """
+    assert len(matching.group_names([left, right], method="damerau")) == 2, label
+
+
+def test_a_name_without_delimiters_is_not_that_shape():
+    """`p1b1` holds the one token `pb` and `p1_b1` holds `p` and `b`, and
+    neither list is inside the other, so the two are compared as whole names."""
+    assert matching._one_name_gained_a_token("MSTO_R_x", "MSTO_x")
+    assert not matching._one_name_gained_a_token("p1b1", "p1_b1")
+    assert matching.group_names(["p1b1", "p1_b1"], method="damerau") == [
+        ["p1_b1", "p1b1"]
+    ]
