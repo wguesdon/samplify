@@ -150,8 +150,16 @@ model call when the offline pass finds no inconsistency and forms no cluster.
 
 samplify checks each proposal from the model, and both backends apply the same
 check. If the model gives one canonical name to two names with different
-numbers, samplify keeps the two apart. Each of the two then keeps its own
-canonical name. The model advises, and the identity rule decides.
+numbers, samplify keeps the two apart. It does the same when two names differ
+by one substituted letter. Each of the two then keeps its own canonical name.
+The model advises, and the identity rules decide.
+
+samplify does not hold the model to the edit cap. A model that joins `ctrl_1`
+with `control_1` joins two names three edits apart, and reading that kind of
+difference is the reason the model backends exist. The cap belongs to the
+distance backends, which have no other evidence to work from. A model that
+proposes a merge no person would accept is what the review step is for, and
+`--yes` records `"reviewed": false` for exactly that reason.
 
 Version 0.3.0 ran that check in the `auto` backend alone. The `llm` backend took
 the groups of the model as they came, so a model that gave one name to `p111`
@@ -489,7 +497,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 230 offline tests, no key and no server
+uv run pytest                 # 255 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

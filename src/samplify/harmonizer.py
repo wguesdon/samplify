@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 from . import rules
 
@@ -259,20 +259,38 @@ def _ask_openrouter(
         raise ValueError(
             "No API key found. Set OPENROUTER_API_KEY in your environment or .env "
             "file, choose --provider ollama, or choose an offline method such as "
-            "--method levenshtein."
+            "--method damerau."
         )
 
     client = OpenAI(api_key=resolved_key, base_url=base_url)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": build_system_prompt()},
-            {"role": "user", "content": _build_user_message(names)},
-        ],
-        temperature=0,
-        response_format={"type": "json_object"},
-        **({"timeout": timeout} if timeout is not None else {}),
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": build_system_prompt()},
+                {"role": "user", "content": _build_user_message(names)},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+            **({"timeout": timeout} if timeout is not None else {}),
+        )
+    except OpenAIError as exc:
+        # The openai package raises its own exceptions, and the command line
+        # catches ValueError. Without this the refused connection, the rejected
+        # key and the rate limit all reach the user as a traceback. The ollama
+        # path already converts its errors the same way.
+        raise ValueError(
+            f"No usable answer from OpenRouter at {base_url}: "
+            f"{type(exc).__name__}: {exc}. Check OPENROUTER_API_KEY and the "
+            f"network, choose --provider ollama, or choose an offline method "
+            f"such as --method damerau."
+        ) from exc
+
+    if not response.choices:
+        raise ValueError(
+            f"OpenRouter returned no choices for model {model!r}. The request "
+            f"reached the service and it produced no answer."
+        )
     return response.choices[0].message.content
 
 

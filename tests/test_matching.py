@@ -683,3 +683,45 @@ def test_the_three_measures_are_still_public():
     assert matching.damerau_levenshtein_distance("patient", "patietn") == 1
     assert matching.similarity("abc", "abd", method="hamming") > 0.6
     assert matching.similarity("abc", "abd", method="levenshtein") > 0.6
+
+
+# ── A chain of allowed edits may not carry a forbidden pair ────────────────
+
+
+def test_a_bridge_cannot_carry_a_substitution_into_a_group():
+    """Grouping is transitive and the match rule is not.
+
+    abcde1 is one deletion from abcdef1 and one deletion from abcdeg1, so the
+    union-find joined all three, and the two ends are one substitution apart.
+    """
+    names = ["abcdef1", "abcde1", "abcdeg1"]
+    assert matching.describe_difference("abcdef1", "abcdeg1") == "substitution"
+    assert matching.group_names(names, method="damerau") == [
+        ["abcde1"],
+        ["abcdef1"],
+        ["abcdeg1"],
+    ]
+
+
+def test_the_bridge_check_leaves_a_clean_group_alone():
+    """The five spellings of one sample hold no forbidden pair."""
+    names = ["P1_B1", "p01_b01", "p1-b1", "patient1_batch1", "patietn1_batch1"]
+    assert matching.group_names(names, method="damerau") == [sorted(names)]
+
+
+def test_clear_name_caches_forgets_a_normalisation():
+    """A rule changed at run time must not read an entry made under the old one."""
+    from samplify import rules
+
+    assert matching.rule_normalise("s1") == "sample1"
+    original = rules.COMPILED_ALIASES
+    try:
+        rules.COMPILED_ALIASES = ()
+        assert matching.rule_normalise("s1") == "sample1"  # the cached answer
+        matching.clear_name_caches()
+        assert matching.rule_normalise("s1") == "s1"
+    finally:
+        rules.COMPILED_ALIASES = original
+        matching.clear_name_caches()
+
+    assert matching.rule_normalise("s1") == "sample1"

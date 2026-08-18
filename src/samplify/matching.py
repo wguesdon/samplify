@@ -92,6 +92,19 @@ MAX_VARIANT_LETTERS = 2
 _SIGN_CHARACTERS = frozenset(rules.IDENTITY_SIGNS + "-")
 
 
+def clear_name_caches() -> None:
+    """Empty the caches of the three functions that read a raw name.
+
+    The rules do not change during a run of the command line, so nothing calls
+    this in production. A test that changes a rule at run time has to, because
+    a cache entry made under the old rule would otherwise survive the change
+    and decide a merge.
+    """
+    digit_signature.cache_clear()
+    letter_skeleton.cache_clear()
+    rule_normalise.cache_clear()
+
+
 # ── String distances ───────────────────────────────────────────────────────
 
 
@@ -103,8 +116,8 @@ _SIGN_CHARACTERS = frozenset(rules.IDENTITY_SIGNS + "-")
 #: this bound.
 #:
 #: A caller that changes a rule at run time, which a test may do, has to call
-#: ``rule_normalise.cache_clear()`` and the same on the other two. The rules do
-#: not change during a run of the command line.
+#: :func:`clear_name_caches`. The rules do not change during a run of the
+#: command line.
 NAME_CACHE_SIZE = 100_000
 
 
@@ -473,6 +486,45 @@ class _UnionFind:
         return [sorted(members) for _, members in sorted(buckets.items())]
 
 
+def split_on_a_substitution(members: list[str]) -> list[list[str]]:
+    """Split a cluster the model formed when one substituted letter sits inside it.
+
+samplify never merges two names that differ by one substituted letter,
+    because that edit carries meaning far more often than it is a typing error.
+    :func:`_matches` decides one pair at a time, and grouping is transitive, so
+    a chain of allowed edits can still carry a forbidden pair into one group.
+    ``abcde1`` is one deletion from ``abcdef1`` and one deletion from
+    ``abcdeg1``, and those two ends are one substitution apart. Every caller
+    that forms a group therefore runs this check over the finished group.
+
+    The model backends run it too. Without it a model that answers
+    ``primary_cells`` for both merges ``Primary B cells`` with
+    ``Primary T cells``.
+
+    A forbidden pair anywhere in the group means the letters were read wrongly,
+    so the whole group falls back to one group per letter skeleton. A group with
+    no forbidden pair is left alone, which is what lets the model still join
+    ``ctrl_1`` with ``control_1``. Those two are three edits apart and no rule
+    here refuses them.
+
+    Args:
+        members: The names of one finished group.
+
+    Returns:
+        One list per group, each sorted, in a deterministic order.
+    """
+    for index, left in enumerate(members):
+        for right in members[index + 1:]:
+            if describe_difference(left, right) == "substitution":
+                by_skeleton: dict[str, list[str]] = {}
+                for member in members:
+                    by_skeleton.setdefault(
+                        letter_skeleton(member), []
+                    ).append(member)
+                return [sorted(group) for _, group in sorted(by_skeleton.items())]
+    return [sorted(members)]
+
+
 def group_names(
     names: list[str],
     *,
@@ -527,7 +579,13 @@ def group_names(
                 if _matches(left, right, method=method, threshold=threshold):
                     union.union(left, right)
 
-    return union.groups()
+    # Grouping is transitive and the match rule is not, so a chain of allowed
+    # edits can carry a forbidden pair into one group.
+    return sorted(
+        group
+        for members in union.groups()
+        for group in split_on_a_substitution(members)
+    )
 
 
 #: Edit kinds that a keystroke produces, whatever the length of the name.

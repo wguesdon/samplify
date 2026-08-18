@@ -121,3 +121,27 @@ def test_no_warning_when_no_model_is_called(capsys, monkeypatch):
     )
     cli._warn_when_the_names_leave_this_machine(args)
     assert capsys.readouterr().out == ""
+
+
+def test_the_names_command_accepts_every_method_it_offers(monkeypatch, capsys):
+    """-M auto was accepted by the parser and then refused by the backend.
+
+    It reported "Unknown offline method: 'auto'", which named the option the
+    person had just been offered.
+    """
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    parser = cli.build_parser()
+    for method in ("rules", "damerau"):
+        assert cli.main(["names", "sample_1", "sample-1", "-M", method]) == 0
+
+    # auto calls no model when the offline pass finds nothing to fix.
+    capsys.readouterr()
+    assert cli.main(["names", "sample_1", "sample_2", "-M", "auto"]) == 0
+
+    # These two mix their delimiters, so auto does call the model and the error
+    # has to name the missing key and nothing else.
+    code = cli.main(["names", "sample_1", "sample-1", "-M", "auto"])
+    printed = " ".join(capsys.readouterr().out.split())
+    assert code == 1
+    assert "No API key found" in printed
+    assert "Unknown offline method" not in printed

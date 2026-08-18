@@ -26,7 +26,7 @@ from rich.table import Table
 
 from . import mapping as mapping_module
 from . import matching
-from .csv_processor import apply_mapping, propose_csv
+from .csv_processor import apply_mapping, propose, propose_csv
 from .harmonizer import (
     DEFAULT_MODEL,
     DEFAULT_OLLAMA_MODEL,
@@ -477,17 +477,29 @@ def _run_names(args: argparse.Namespace) -> int:
         console.print("[yellow]No sample names given. Use --help for usage.[/yellow]")
         return 1
 
+    _warn_when_the_names_leave_this_machine(args)
+
     try:
-        if args.method == "llm":
-            result = harmonize(
+        if args.method in ("llm", "auto"):
+            # propose runs the whole backend, including the guards that a raw
+            # model answer has to pass. Calling harmonize here showed the answer
+            # of the model and not the answer of samplify, and it left the auto
+            # method with no handler at all.
+            result = propose(
                 names,
+                method=args.method,
+                threshold=args.threshold,
                 model=args.model,
                 provider=args.provider,
                 base_url=args.base_url,
                 timeout=args.timeout,
             )
-            pairs = sorted(result["mapping"].items())
-            pattern = result.get("canonical_pattern", "")
+            pairs = sorted(
+                (member, group.proposed)
+                for group in result.groups
+                for member in group.members
+            )
+            pattern = result.canonical_pattern or f"method={args.method}"
         else:
             groups = matching.group_names(
                 names, method=args.method, threshold=args.threshold

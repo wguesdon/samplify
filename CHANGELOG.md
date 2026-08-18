@@ -13,6 +13,40 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.1] - 2026-08-18
+
+A third review found five defects. Two of them merged two different samples.
+
+### Fixed
+
+- A chain of allowed edits can no longer carry a forbidden pair into one group.
+  Grouping is transitive and the match rule is not, so `abcde1` joined
+  `abcdef1` by one deletion and `abcdeg1` by another, and the two ends are one
+  substitution apart. Every group is now checked once it is finished, by the
+  same rule the model backends already used. The check lives in
+  `matching.split_on_a_substitution` and both callers share it.
+- A failure from OpenRouter becomes a clear error instead of a traceback. The
+  openai package raises its own exception types and the command line catches
+  `ValueError`, so a refused connection, a rejected key and a rate limit all
+  reached the user as a stack trace. The ollama path already converted its
+  errors this way. An answer with no choices is refused too.
+- `samplify names -M auto` works. The parser offered `auto` and the command
+  passed it to the offline grouping, which answered `Unknown offline method:
+  'auto'` and named the option the person had just been offered. Both model
+  methods now run the whole backend, so `names` shows the answer of samplify
+  and not the raw answer of the model.
+- The message for a missing API key no longer recommends `--method
+  levenshtein`, which 0.8.0 removed.
+- `matching.clear_name_caches` empties the three caches in one call. Nothing in
+  the command line changes a rule at run time, and a test that does needs this.
+
+### Not changed
+
+The model backends are not held to the edit cap. A model that joins `ctrl_1`
+with `control_1` joins two names three edits apart, and reading that kind of
+difference is the reason those backends exist. The review reported it, and
+`docs/how_it_works.md` now states the reasoning.
+
 ## [0.9.0] - 2026-08-18
 
 ### Fixed

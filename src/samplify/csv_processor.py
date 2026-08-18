@@ -310,39 +310,6 @@ def propose(
     )
 
 
-def _split_on_a_substitution(members: list[str]) -> list[list[str]]:
-    """Split a cluster the model formed when one substituted letter sits inside it.
-
-    The offline backends never merge two names that differ by one substituted
-    letter, because that edit carries meaning far more often than it is a
-    typing error. The model has to obey the same rule. Without it a model that
-    answers ``primary_cells`` for both merges ``Primary B cells`` with
-    ``Primary T cells``, which the offline path refuses.
-
-    A forbidden pair anywhere in the cluster means the model read the letters
-    wrongly, so the whole cluster falls back to one group per letter skeleton.
-    A cluster with no forbidden pair is left alone, which is what lets the model
-    still join ``ctrl_1`` with ``control_1``. Those two are three edits apart
-    and no rule here refuses them.
-
-    Args:
-        members: The names the model put in one cluster.
-
-    Returns:
-        One list per group, each sorted, in a deterministic order.
-    """
-    for index, left in enumerate(members):
-        for right in members[index + 1:]:
-            if matching.describe_difference(left, right) == "substitution":
-                by_skeleton: dict[str, list[str]] = {}
-                for member in members:
-                    by_skeleton.setdefault(
-                        matching.letter_skeleton(member), []
-                    ).append(member)
-                return [sorted(group) for _, group in sorted(by_skeleton.items())]
-    return [sorted(members)]
-
-
 def _cluster_by_canonical(
     names: list[str],
     mapping: dict[str, str],
@@ -375,7 +342,7 @@ def _cluster_by_canonical(
         canonical_signature = matching.digit_signature(canonical_name)
         canonical_skeleton = matching.letter_skeleton(canonical_name)
         for signature, safe_members in sorted(by_signature.items()):
-            for group in _split_on_a_substitution(sorted(safe_members)):
+            for group in matching.split_on_a_substitution(sorted(safe_members)):
                 clusters.append(group)
                 # The name belongs to one digit signature and one set of
                 # letters. Giving it to the other halves of a refused merge
@@ -430,7 +397,7 @@ def _merge_clusters_by_model(
         for signature, safe_reps in sorted(by_signature.items()):
             # The substitution rule reads the representatives, because those
             # are the names the model was shown and the names it joined.
-            for kept_reps in _split_on_a_substitution(sorted(safe_reps)):
+            for kept_reps in matching.split_on_a_substitution(sorted(safe_reps)):
                 members = sorted(m for rep in kept_reps for m in rep_to_cluster[rep])
                 clusters.append(members)
                 # The name belongs to one digit signature and one set of

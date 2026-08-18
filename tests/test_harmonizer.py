@@ -367,3 +367,49 @@ def test_zero_padding():
     assert len(set(canonical_values)) == 1, (
         f"Expected all to map to same name, got: {canonical_values}"
     )
+
+
+# ── A network failure must not reach the user as a traceback ───────────────
+
+
+@pytest.mark.parametrize(
+    "raised",
+    [
+        "APIConnectionError",
+        "APITimeoutError",
+        "AuthenticationError",
+        "RateLimitError",
+    ],
+)
+def test_an_openrouter_failure_becomes_a_clear_error(raised, monkeypatch):
+    """The command line catches ValueError, and the openai package does not
+    raise one. Without the conversion a refused connection, a rejected key and
+    a rate limit all reached the user as a traceback."""
+    import httpx
+    import openai
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    exceptions = {
+        "APIConnectionError": openai.APIConnectionError(request=request),
+        "APITimeoutError": openai.APITimeoutError(request=request),
+        "AuthenticationError": openai.AuthenticationError(
+            "bad key", response=httpx.Response(401, request=request), body=None
+        ),
+        "RateLimitError": openai.RateLimitError(
+            "slow down", response=httpx.Response(429, request=request), body=None
+        ),
+    }
+
+    with patch("samplify.harmonizer.OpenAI") as client_cls:
+        client_cls.return_value.chat.completions.create.side_effect = exceptions[raised]
+        with pytest.raises(ValueError, match="No usable answer from OpenRouter"):
+            harmonize(["sample_1", "sample-1"])
+
+
+def test_an_answer_with_no_choices_is_refused(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    with patch("samplify.harmonizer.OpenAI") as client_cls:
+        client_cls.return_value.chat.completions.create.return_value = MagicMock(choices=[])
+        with pytest.raises(ValueError, match="no choices"):
+            harmonize(["sample_1"])
