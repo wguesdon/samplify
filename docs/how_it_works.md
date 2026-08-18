@@ -212,6 +212,32 @@ family, the pair `t` and `tp` is a treatment and a timepoint, and the pair `k`
 and `ko` is a plate letter and a knockout. A short pair therefore has to clear
 the ratio like any other pair, and `wt` against `wnt` scores 0.667.
 
+## The edit cap
+
+A ratio is not enough on its own at the other end of the scale either. A ratio
+scales with the length of the name, so a long shared context hides a short
+difference that carries the whole identity. samplify therefore also caps the
+distance, and `MAX_TYPO_EDITS` holds the value 1. A slipped keystroke is one
+edit, and it is one edit whatever the length of the name.
+
+The cap comes from a run on 20000 human RNA-seq runs of the ENA archive.
+Without it samplify merged `EVT-TS-1_paired-RNA` with `ST-TS-1_paired-RNA`,
+which are two cell types two edits and a ratio of 0.857 apart. It merged
+`Mock_SKNSH transcriptome after vector transfection` with the same sentence
+written `Mock_TGW`, which are two cell lines five edits and a ratio of 0.889
+apart. Both real typing errors in that corpus were one edit apart. The cap
+removed 246 of the 350 merges that samplify proposed there.
+
+The cap costs a name that holds two typing errors, which stays in its own
+group. A person then reads two samples where there is one. That is the failure
+this tool prefers, because a wrong merge drops a row and reports nothing.
+
+The cap also decides the cost of the search. A distance that may not exceed one
+edit needs three diagonals of the grid and not the whole grid, so one
+comparison costs the length of the name rather than its square. `propose` on
+2267 sample titles of median length 97 took 376.9 seconds without the cap and
+39.0 seconds with it.
+
 Two names with no letter at all never match. The ratio compares two empty
 strings and scores 1.0, which reads as agreement and is the absence of any
 evidence.
@@ -392,7 +418,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 202 offline tests, no key and no server
+uv run pytest                 # 209 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

@@ -13,6 +13,49 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.5.0] - 2026-08-18
+
+The first version measured against real data. 20000 human RNA-seq runs were
+read from the ENA portal API, and the free-text fields that the submitting lab
+typed were run through samplify. It merged two different samples, so this
+version adds a rule and changes which names group together.
+
+### Fixed
+
+- samplify caps the distance between the letters of two names it merges, and
+  `MAX_TYPO_EDITS` holds the value 1. A ratio scales with the length of a name,
+  so a long shared context hid a short difference that carried the whole
+  identity. samplify merged `EVT-TS-1_paired-RNA` with `ST-TS-1_paired-RNA`,
+  two cell types two edits and a ratio of 0.857 apart, and
+  `Mock_SKNSH transcriptome after vector transfection` with the same sentence
+  written `Mock_TGW`, two cell lines five edits and a ratio of 0.889 apart. The
+  cap removed 246 of the 350 merges that samplify proposed on that corpus, and
+  it kept every real typing error, because all of them were one edit apart.
+
+### Changed
+
+- `damerau_levenshtein_distance` takes an optional `max_distance`. The work
+  then stays inside a band of that width around the diagonal, because a path
+  that leaves the band already costs more than the band. The result is exact at
+  or below the value and reports `max_distance + 1` above it. 200000 random
+  pairs were checked against the full grid.
+- `describe_difference` reads a transposition from the two differing positions
+  instead of running a second distance over the whole grid. 60000 random pairs
+  were checked against the previous form.
+- `propose` on 2267 sample titles of median length 97 took 376.9 seconds and
+  now takes 39.0 seconds. On 3243 library names of median length 53 it took
+  2.7 seconds and now takes 1.4 seconds.
+
+### Known and not fixed
+
+The cap is not sufficient. Of the 104 merges that survive it on the same
+corpus, 42 come from one substituted letter and 11 from a symbol that
+normalisation drops. Both classes are wrong. `TSmatKO-1` merged with
+`TSpatKO-1`, which are a maternal and a paternal knockout, and `OVTOKO_DOX+`
+merged with `OVTOKO_DOX-`. A substitution has to be judged against the token it
+sits in and not against the whole name, and a `+` or a `-` next to a token
+carries meaning that normalisation deletes.
+
 ## [0.4.1] - 2026-08-18
 
 ### Fixed

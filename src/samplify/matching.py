@@ -45,6 +45,24 @@ _DIGIT_RUN = re.compile(r"\d+")
 #: clear the ratio like any other pair.
 MIN_SLIP_LENGTH = 5
 
+#: The most edits that samplify accepts between the letters of two names it
+#: merges. A slipped keystroke is one edit, and it is one edit whatever the
+#: length of the name.
+#:
+#: A ratio cannot say that on its own, because a ratio scales with the length
+#: and a long shared context then hides a short difference that carries the
+#: whole identity. On 20000 real ENA runs samplify merged
+#: ``EVT-TS-1_paired-RNA`` with ``ST-TS-1_paired-RNA``, which are two cell
+#: types two edits and a ratio of 0.857 apart. It merged
+#: ``Mock_SKNSH transcriptome after vector transfection`` with the same name
+#: written ``Mock_TGW``, which are two cell lines five edits and a ratio of
+#: 0.889 apart. Both real typing errors in the same corpus were one edit apart.
+#:
+#: The cap costs a name with two typing errors, which stays in its own group. A
+#: person then reads two samples where there is one, and that is the failure
+#: this tool prefers. A wrong merge drops a row and reports nothing.
+MAX_TYPO_EDITS = 1
+
 
 # ── String distances ───────────────────────────────────────────────────────
 
@@ -103,7 +121,7 @@ def levenshtein_distance(a: str, b: str) -> int:
     return previous[-1]
 
 
-def damerau_levenshtein_distance(a: str, b: str) -> int:
+def damerau_levenshtein_distance(a: str, b: str, max_distance: int | None = None) -> int:
     """Count the edits that turn one string into another, transposition included.
 
     This is the optimal string alignment variant. It counts insertion,
@@ -112,39 +130,69 @@ def damerau_levenshtein_distance(a: str, b: str) -> int:
     plain Levenshtein charges two edits for it, which pushes a real typo below
     any sensible threshold.
 
+    A caller that only needs to know whether the distance is small passes
+    ``max_distance``. The work then stays inside a band of that width around
+    the diagonal, because a path that leaves the band already costs more than
+    the band. The full grid costs the product of the two lengths, and the band
+    costs the length times the width. Two sample titles of 100 characters are
+    10000 cells and 300 cells respectively.
+
     Args:
         a: The first string.
         b: The second string.
+        max_distance: The largest distance the caller cares about. The result
+            is exact at or below this value, and it is ``max_distance + 1`` for
+            every distance above it.
 
     Returns:
-        The edit distance between the two strings.
+        The edit distance between the two strings, capped as described above.
     """
     if a == b:
         return 0
     if not a:
-        return len(b)
+        return len(b) if max_distance is None else min(len(b), max_distance + 1)
     if not b:
-        return len(a)
+        return len(a) if max_distance is None else min(len(a), max_distance + 1)
 
     rows, cols = len(a) + 1, len(b) + 1
-    grid = [[0] * cols for _ in range(rows)]
-    for i in range(rows):
+    if max_distance is not None and abs(len(a) - len(b)) > max_distance:
+        # One string cannot reach the other without that many insertions.
+        return max_distance + 1
+
+    band = max(rows, cols) if max_distance is None else max_distance
+    # Any value above every real distance, for the cells outside the band.
+    beyond = max(rows, cols)
+
+    grid = [[beyond] * cols for _ in range(rows)]
+    for i in range(min(rows, band + 1)):
         grid[i][0] = i
-    for j in range(cols):
+    for j in range(min(cols, band + 1)):
         grid[0][j] = j
 
     for i in range(1, rows):
-        for j in range(1, cols):
+        low = max(1, i - band)
+        high = min(cols - 1, i + band)
+        if low > high:
+            break
+        for j in range(low, high + 1):
             cost = 0 if a[i - 1] == b[j - 1] else 1
-            grid[i][j] = min(
+            best = min(
                 grid[i - 1][j] + 1,          # deletion
                 grid[i][j - 1] + 1,          # insertion
                 grid[i - 1][j - 1] + cost,   # substitution
             )
             if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
-                grid[i][j] = min(grid[i][j], grid[i - 2][j - 2] + 1)  # transposition
+                best = min(best, grid[i - 2][j - 2] + 1)  # transposition
+            grid[i][j] = best
 
-    return grid[-1][-1]
+        if max_distance is not None and min(grid[i][low:high + 1]) > max_distance:
+            # Every path still open already costs more than the caller asked for.
+            return max_distance + 1
+
+    distance = grid[-1][-1]
+    if max_distance is not None and distance > max_distance:
+        return max_distance + 1
+    return distance
 
 
 def similarity(a: str, b: str, method: str = DEFAULT_DISTANCE) -> float:
@@ -459,12 +507,22 @@ def describe_difference(a: str, b: str) -> str:
         return "formatting only"
 
     left, right = letter_skeleton(a), letter_skeleton(b)
-    distance = damerau_levenshtein_distance(left, right)
-    if distance != 1:
+    if damerau_levenshtein_distance(left, right, max_distance=1) != 1:
         return "unrelated"
     if len(left) != len(right):
         return "insertion or deletion"
-    if levenshtein_distance(left, right) == 2:
+
+    # The two strings are the same length and one edit apart, so the difference
+    # is one substitution or one swap of two adjacent characters. Reading the
+    # positions costs the length of the name, and a second distance over the
+    # whole grid costs its square.
+    differing = [i for i, (x, y) in enumerate(zip(left, right)) if x != y]
+    if (
+        len(differing) == 2
+        and differing[1] == differing[0] + 1
+        and left[differing[0]] == right[differing[1]]
+        and left[differing[1]] == right[differing[0]]
+    ):
         return "transposition"
     return "substitution"
 
@@ -512,6 +570,19 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     # evidence, so the ratio may not decide it. Two names that differ only in
     # their numbers already left this function at the blocking step.
     if not left or not right:
+        return False
+
+    # A slipped keystroke is one edit whatever the length of the name, and the
+    # cap says so at every length. A ratio cannot, because it scales with the
+    # length: EVT-TS-1_paired-RNA and ST-TS-1_paired-RNA are two cell types,
+    # they are two edits apart and they score 0.857.
+    if method == "hamming":
+        distance = hamming_distance(left, right)
+        if distance is None:
+            return False
+    else:
+        distance = damerau_levenshtein_distance(left, right, max_distance=MAX_TYPO_EDITS)
+    if distance > MAX_TYPO_EDITS:
         return False
 
     if (

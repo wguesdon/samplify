@@ -435,3 +435,90 @@ def test_near_miss_fires_at_scale_where_the_series_has_a_gap():
     names.append("patient2999_batch1")
 
     assert ("patient29999_batch1", "patient2999_batch1") in matching.find_near_misses(names)
+
+
+# ── The edit cap, from the validation on real ENA data ─────────────────────
+
+
+def test_two_edits_do_not_merge_however_long_the_name():
+    """EVT and ST are two cell types, and the ratio let them merge.
+
+    The pair scores 0.857 because the two names share sixteen characters. The
+    three that differ carry the whole identity. This pair comes from PRJDB12972
+    of the ENA archive.
+    """
+    names = ["EVT-TS-1_paired-RNA", "ST-TS-1_paired-RNA"]
+    assert matching.similarity(
+        matching.letter_skeleton(names[0]), matching.letter_skeleton(names[1])
+    ) > 0.85
+    assert matching.group_names(names, method="damerau") == [
+        ["EVT-TS-1_paired-RNA"],
+        ["ST-TS-1_paired-RNA"],
+    ]
+
+
+def test_a_long_shared_context_does_not_carry_a_merge():
+    """SK-N-SH and TGW are two cell lines, and the sentence around them agreed.
+
+    This pair comes from PRJDB14234 and scores 0.889 over five edits.
+    """
+    names = [
+        "Mock_SKNSH transcriptome after vector transfection",
+        "Mock_TGW transcriptome after vector transfection",
+    ]
+    assert matching.group_names(names, method="damerau") == [
+        ["Mock_SKNSH transcriptome after vector transfection"],
+        ["Mock_TGW transcriptome after vector transfection"],
+    ]
+
+
+def test_one_edit_still_merges_at_every_length():
+    """The cap keeps every real typing error that the corpus held."""
+    for pair in (
+        ["smple_1", "sample_1"],
+        ["sampel_5", "sample_5"],
+        ["patietn1_batch1", "patient1_batch1"],
+    ):
+        assert len(matching.group_names(pair, method="damerau")) == 1, pair
+
+
+# ── The banded distance ────────────────────────────────────────────────────
+
+
+def test_the_banded_distance_is_exact_at_or_below_the_cap():
+    for a, b, distance in (
+        ("patient", "patient", 0),
+        ("patient", "patietn", 1),
+        ("sample", "smple", 1),
+        ("batcha", "batchb", 1),
+    ):
+        assert matching.damerau_levenshtein_distance(a, b, max_distance=2) == distance
+
+
+def test_the_banded_distance_reports_one_above_the_cap():
+    """A caller that asked about one edit learns only that there are more."""
+    assert matching.damerau_levenshtein_distance("abcdef", "uvwxyz", max_distance=1) == 2
+    assert matching.damerau_levenshtein_distance("abcdef", "uvwxyz", max_distance=3) == 4
+    assert matching.damerau_levenshtein_distance("abcdef", "uvwxyz") == 6
+
+
+def test_the_banded_distance_agrees_with_the_full_grid():
+    """Random strings, every cap from zero to four, against the whole grid."""
+    import random
+
+    random.seed(11)
+    for _ in range(400):
+        a = "".join(random.choice("abcdef") for _ in range(random.randint(0, 10)))
+        b = "".join(random.choice("abcdef") for _ in range(random.randint(0, 10)))
+        true = matching.damerau_levenshtein_distance(a, b)
+        for cap in range(5):
+            expected = true if true <= cap else cap + 1
+            assert matching.damerau_levenshtein_distance(a, b, max_distance=cap) == expected
+
+
+def test_describe_difference_still_separates_a_swap_from_a_substitution():
+    """The swap is now read from the positions and not from a second distance."""
+    assert matching.describe_difference("patietn_1", "patient_1") == "transposition"
+    assert matching.describe_difference("batcha_1", "batchb_1") == "substitution"
+    assert matching.describe_difference("smple_1", "sample_1") == "insertion or deletion"
+    assert matching.describe_difference("alpha_1", "omega_1") == "unrelated"
