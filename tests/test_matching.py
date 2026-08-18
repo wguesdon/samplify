@@ -276,3 +276,92 @@ def test_canonical_does_not_depend_on_input_order():
     assert matching.canonical_for_group(group) == matching.canonical_for_group(
         list(reversed(group))
     )
+
+
+# ── The review findings of 2026-08-18 ──────────────────────────────────────
+
+
+def test_a_letter_before_a_digit_is_not_an_identity_suffix():
+    """p1b1 and p1_b1 are one sample written two ways.
+
+    The b of p1b1 introduces the next number. Reading it as a replicate letter
+    gave the compact form the signature ('1b', '1') and the delimited form the
+    signature ('1', '1'), so the two never reached the same block.
+    """
+    assert matching.digit_signature("p1b1") == ("1", "1")
+    assert matching.digit_signature("p1_b1") == ("1", "1")
+    assert matching.group_names(["p1b1", "p1_b1"], method="damerau") == [
+        ["p1_b1", "p1b1"]
+    ]
+
+
+def test_a_replicate_letter_at_the_end_stays_in_the_signature():
+    assert matching.digit_signature("sample_9a") == ("9a",)
+    assert matching.digit_signature("sample_9b") == ("9b",)
+    assert matching.group_names(["sample_9a", "sample_9b"], method="damerau") == [
+        ["sample_9a"],
+        ["sample_9b"],
+    ]
+
+
+def test_a_replicate_letter_in_another_script_keeps_two_samples_apart():
+    """The identity rule works on a letter, not on an ASCII letter."""
+    assert matching.digit_signature("sample_9α") == ("9α",)
+    assert matching.digit_signature("sample_9β") == ("9β",)
+    assert matching.group_names(["sample_9α", "sample_9β"], method="damerau") == [
+        ["sample_9α"],
+        ["sample_9β"],
+    ]
+
+
+def test_two_names_in_another_script_do_not_normalise_to_the_same_string():
+    """Dropping every non-ASCII letter left only the number behind."""
+    assert matching.rule_normalise("Пациент_1") == "пациент1"
+    assert matching.rule_normalise("Δείγμα_1") == "δείγμα1"
+    assert matching.group_names(["Пациент_1", "Δείγμα_1"], method="damerau") == [
+        ["Δείγμα_1"],
+        ["Пациент_1"],
+    ]
+
+
+def test_a_short_name_needs_the_ratio_for_one_inserted_letter():
+    """wt is wildtype and wnt is a gene family, and one letter separates them."""
+    assert matching.group_names(["wt_1", "wnt_1"], method="damerau") == [
+        ["wnt_1"],
+        ["wt_1"],
+    ]
+    assert matching.group_names(["t_1", "tp_1"], method="damerau") == [
+        ["t_1"],
+        ["tp_1"],
+    ]
+    assert matching.group_names(["k_1", "ko_1"], method="damerau") == [
+        ["k_1"],
+        ["ko_1"],
+    ]
+
+
+def test_a_long_name_still_matches_on_one_dropped_letter():
+    """The rule that finds a real typing error is unchanged above the limit."""
+    assert matching.group_names(["smple_1", "sample_1"], method="damerau") == [
+        ["sample_1", "smple_1"]
+    ]
+    assert matching.group_names(["sampel_5", "sample_5"], method="damerau") == [
+        ["sampel_5", "sample_5"]
+    ]
+
+
+def test_two_names_without_a_letter_do_not_match():
+    """Two empty letter skeletons score 1.0 against each other."""
+    assert matching.group_names(["###", "$$$"], method="damerau") == [["###"], ["$$$"]]
+    assert matching.group_names(["###", "$$$"], method="rules") == [["###"], ["$$$"]]
+
+
+def test_group_names_refuses_a_threshold_outside_the_ratio():
+    for value in (-0.1, 1.5):
+        with pytest.raises(ValueError, match="between 0.0 and 1.0"):
+            matching.group_names(["a_1"], method="damerau", threshold=value)
+
+
+def test_the_canonical_name_of_an_unnormalisable_group_is_the_raw_name():
+    """An empty canonical name would rename the sample to nothing."""
+    assert matching.canonical_for_group(["###"]) == "###"

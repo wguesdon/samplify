@@ -93,8 +93,11 @@ def _ordered_names(mapping: MappingFile, limit: int) -> tuple[list[str], list[tu
     names: list[str] = []
     blocks: list[tuple[int, int, str]] = []
     for group in groups:
+        # Skip a group that does not fit and keep reading. A break here dropped
+        # every group behind the first one that was too large, including the
+        # small ones that still had room.
         if len(names) + len(group.members) > limit and names:
-            break
+            continue
         kind = "merge" if group.is_merge else ("rename" if group.is_rename else "unchanged")
         blocks.append((len(names), len(group.members), kind))
         names.extend(group.members)
@@ -104,16 +107,22 @@ def _ordered_names(mapping: MappingFile, limit: int) -> tuple[list[str], list[tu
 def _similarity_matrix(names: list[str]) -> list[list[float]]:
     """Build the pairwise similarity matrix for a list of names.
 
+    The score compares the letter skeletons, which is the value that decided
+    each group. Scoring the whole raw name showed a person a measure that took
+    no part in the decision. It also makes the near misses visible: a pair with
+    identical letters and different numbers reads 1.0 and carries no outline,
+    which is the reason samplify refused to merge it.
+
     Args:
         names: The names, already in display order.
 
     Returns:
         A square matrix of similarities between 0.0 and 1.0.
     """
-    lowered = [n.strip().lower() for n in names]
+    skeletons = [matching.letter_skeleton(n) for n in names]
     return [
-        [matching.similarity(a, b, method=matching.DEFAULT_DISTANCE) for b in lowered]
-        for a in lowered
+        [matching.similarity(a, b, method=matching.DEFAULT_DISTANCE) for b in skeletons]
+        for a in skeletons
     ]
 
 
@@ -162,7 +171,8 @@ def _panel_heatmap(ax: Any, mapping: MappingFile) -> None:
     shown = len(blocks)
     suffix = "" if shown == total else f", {shown} of {total} groups shown"
     ax.set_title(
-        f"Name similarity, ordered by group{suffix}\ndarker means more alike",
+        f"Letter similarity, ordered by group{suffix}\n"
+        f"darker means more alike, and the numbers are not in this panel",
         fontsize=10,
         color=_COLOURS["text"],
     )

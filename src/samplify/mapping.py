@@ -11,6 +11,7 @@ the same input give the same output on any machine and on any day.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -134,6 +135,22 @@ class Group:
             )
         if not data["members"]:
             raise ValueError(f"Group {data['id']} has no members.")
+
+        # A name is checked here and not coerced. str(None) gives the string
+        # "None", and a group carrying it renames every member of a sample to
+        # the four characters None at the apply step.
+        for key in ("proposed", "final"):
+            if not isinstance(data[key], str) or not data[key].strip():
+                raise ValueError(
+                    f"Group {data['id']} has {key} {data[key]!r}. A canonical "
+                    f"name must be a string that holds a character."
+                )
+        for member in data["members"]:
+            if not isinstance(member, str) or not member.strip():
+                raise ValueError(
+                    f"Group {data['id']} has the member {member!r}. A member "
+                    f"must be a string that holds a character."
+                )
         return cls(
             id=int(data["id"]),
             members=list(data["members"]),
@@ -225,15 +242,22 @@ class MappingFile:
         groups landing on one canonical name is not, and it silently joins two
         samples that the tool itself considered distinct.
 
+        A rejected group counts through its original names. Rejection keeps
+        every member as it was written, so those names stay in the output
+        namespace. A second group renamed onto one of them merges two samples
+        exactly as two equal canonical names do.
+
         Returns:
-            A dictionary from the shared canonical name to the group ids that
-            produce it. Empty when there is no collision.
+            A dictionary from the shared name to the group ids that produce it.
+            Empty when there is no collision.
         """
         by_name: dict[str, list[int]] = {}
         for group in self.groups:
             if group.status == STATUS_REJECTED:
-                continue
-            by_name.setdefault(group.final, []).append(group.id)
+                for member in group.members:
+                    by_name.setdefault(member, []).append(group.id)
+            else:
+                by_name.setdefault(group.final, []).append(group.id)
         return {name: ids for name, ids in sorted(by_name.items()) if len(ids) > 1}
 
     def summary(self) -> dict[str, int]:
@@ -302,6 +326,17 @@ class MappingFile:
         if "groups" not in data:
             raise ValueError("Mapping file has no 'groups' key.")
 
+        # The reviewed field decides whether the collision guard runs, so it is
+        # checked and not coerced. bool("false") is True, and a file holding
+        # the string would switch the guard off.
+        reviewed = data.get("reviewed", False)
+        if not isinstance(reviewed, bool):
+            raise ValueError(
+                f"The 'reviewed' field is {reviewed!r}. It must be true or "
+                f"false, because it decides whether apply refuses a mapping "
+                f"in which two groups produce one name."
+            )
+
         groups = [Group.from_dict(g) for g in data["groups"]]
 
         seen: dict[str, int] = {}
@@ -321,7 +356,7 @@ class MappingFile:
             column=data.get("column"),
             model=data.get("model"),
             provider=data.get("provider"),
-            reviewed=bool(data.get("reviewed", False)),
+            reviewed=reviewed,
             reviewed_at=data.get("reviewed_at"),
             created=str(data.get("created", _now())),
             diagnosis=dict(data.get("diagnosis", {})),
@@ -339,6 +374,11 @@ class MappingFile:
 def write(mapping: MappingFile, path: str | Path) -> Path:
     """Write a mapping file to disk as indented JSON.
 
+    The write goes to a temporary file in the same directory and then replaces
+    the target in one operation. This file holds the decisions a person made,
+    and a crash during a plain write leaves a truncated document and loses that
+    work.
+
     Args:
         mapping: The mapping file to write.
         path: Where to write it.
@@ -347,9 +387,15 @@ def write(mapping: MappingFile, path: str | Path) -> Path:
         The path written.
     """
     path = Path(path)
-    with open(path, "w") as fh:
-        json.dump(mapping.to_dict(), fh, indent=2)
-        fh.write("\n")
+    temporary = path.with_name(f"{path.name}.tmp")
+    try:
+        with open(temporary, "w") as fh:
+            json.dump(mapping.to_dict(), fh, indent=2)
+            fh.write("\n")
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
     return path
 
 

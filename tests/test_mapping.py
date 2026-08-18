@@ -214,3 +214,91 @@ def test_read_rejects_invalid_json(tmp_path):
     path.write_text("{not json")
     with pytest.raises(ValueError, match="not valid JSON"):
         mapping_module.read(path)
+
+
+# ── The review findings of 2026-08-18 ──────────────────────────────────────
+
+
+def test_collisions_count_the_original_names_of_a_rejected_group():
+    """A rejected group keeps its names, so they stay in the output namespace.
+
+    Group 1 was rejected and keeps patient11_batch1. Group 2 was renamed onto
+    that same name. Skipping the rejected group hid the collision, and apply
+    then gave two patients one name with no message.
+    """
+    result = MappingFile(
+        groups=[
+            _group(1, ["patient11_batch1"], "patient11_batch1", STATUS_REJECTED),
+            _group(2, ["patient111_batch1"], "patient11_batch1", STATUS_EDITED),
+        ]
+    )
+    assert result.collisions() == {"patient11_batch1": [1, 2]}
+
+
+def test_reviewed_must_be_a_boolean():
+    """bool("false") is True, and the string switched the collision guard off."""
+    document = {
+        "schema_version": 1,
+        "reviewed": "false",
+        "groups": [
+            {
+                "id": 1,
+                "members": ["a_1"],
+                "proposed": "a1",
+                "final": "a1",
+                "status": STATUS_ACCEPTED,
+            }
+        ],
+    }
+    with pytest.raises(ValueError, match="must be true or false"):
+        MappingFile.from_dict(document)
+
+
+@pytest.mark.parametrize("value", [None, "", "   ", 3])
+def test_a_canonical_name_that_is_not_a_name_is_refused(value):
+    """str(None) gives the string None, and every member took that name."""
+    document = {
+        "id": 1,
+        "members": ["a_1"],
+        "proposed": value,
+        "final": "a1",
+        "status": STATUS_ACCEPTED,
+    }
+    with pytest.raises(ValueError, match="must be a string that holds a character"):
+        Group.from_dict(document)
+
+
+def test_a_member_that_is_not_a_name_is_refused():
+    document = {
+        "id": 1,
+        "members": ["a_1", ""],
+        "proposed": "a1",
+        "final": "a1",
+        "status": STATUS_ACCEPTED,
+    }
+    with pytest.raises(ValueError, match="must be a string that holds a character"):
+        Group.from_dict(document)
+
+
+def test_write_leaves_no_temporary_file(tmp_path):
+    path = tmp_path / "mapping.json"
+    mapping_module.write(MappingFile(groups=[_group(1, ["a_1"], "a1")]), path)
+    assert path.exists()
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_a_failed_write_keeps_the_previous_file(tmp_path, monkeypatch):
+    """This file holds the decisions a person made, so a crash must not lose them."""
+    path = tmp_path / "mapping.json"
+    mapping_module.write(MappingFile(groups=[_group(1, ["a_1"], "a1")]), path)
+    before = path.read_text()
+
+    def explode(*args, **kwargs):
+        raise OSError("the disk is full")
+
+    monkeypatch.setattr(mapping_module.json, "dump", explode)
+    with pytest.raises(OSError):
+        mapping_module.write(MappingFile(groups=[_group(2, ["b_2"], "b2")]), path)
+
+    assert path.read_text() == before
+    assert list(tmp_path.iterdir()) == [path]

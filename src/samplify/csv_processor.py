@@ -10,6 +10,7 @@ file is the same on any machine and on any day.
 
 from __future__ import annotations
 
+import csv
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,42 @@ import pandas as pd
 from . import matching, rules
 from .harmonizer import DEFAULT_PROVIDER, harmonize, resolve_model
 from .mapping import Group, MappingFile
+
+
+def _read_csv(path: Path, column: str) -> pd.DataFrame:
+    """Read a CSV without letting pandas reinterpret an identifier.
+
+    The default reader infers a type per column, and both of its guesses
+    destroy a sample name. It reads ``007`` as the number 7 and drops the zero
+    padding, and it reads the name ``NA`` as a missing value and deletes it.
+    Every column is therefore read as text, and no value is treated as missing.
+
+    Args:
+        path: The CSV to read.
+        column: The column of sample names, checked for a duplicate.
+
+    Returns:
+        The whole file as text.
+
+    Raises:
+        ValueError: If the column is absent, or if the header holds it twice.
+    """
+    header: list[str] = []
+    with open(path, newline="") as fh:
+        header = next(csv.reader(fh), [])
+    if header.count(column) > 1:
+        raise ValueError(
+            f"Column {column!r} appears {header.count(column)} times in {path}. "
+            f"pandas renames the second one, so half the names would be "
+            f"invisible. Give each column its own name."
+        )
+
+    df = pd.read_csv(path, dtype=str, keep_default_na=False, na_filter=False)
+    if column not in df.columns:
+        raise ValueError(
+            f"Column {column!r} not found in {path}. Available: {list(df.columns)}"
+        )
+    return df
 
 
 def diagnose(names: list[str]) -> dict:
@@ -220,8 +257,8 @@ def propose(
         canonical_pattern = result.get("canonical_pattern", "")
         used_model = resolve_model(model, provider=provider)
         used_provider = provider
-        clusters = _cluster_by_canonical(unique, result["mapping"])
-        groups = _build_groups(clusters, occurrences, method, canonical=result["mapping"])
+        clusters, canonical = _cluster_by_canonical(unique, result["mapping"])
+        groups = _build_groups(clusters, occurrences, method, canonical=canonical)
 
     else:  # auto
         offline = matching.group_names(
@@ -261,20 +298,48 @@ def propose(
     )
 
 
-def _cluster_by_canonical(names: list[str], mapping: dict[str, str]) -> list[list[str]]:
-    """Group names that a model gave the same canonical form.
+def _cluster_by_canonical(
+    names: list[str],
+    mapping: dict[str, str],
+) -> tuple[list[list[str]], dict[str, str]]:
+    """Group names that a model gave the same canonical form, and guard the digits.
+
+    The identity rule applies to the model here exactly as it applies in
+    :func:`_merge_clusters_by_model`. A model that gives one canonical name to
+    ``p111`` and ``p112`` is refused, and each name keeps its own group.
 
     Args:
         names: The raw names.
         mapping: The model's mapping from original to canonical.
 
     Returns:
-        One list of members per canonical name, each sorted.
+        The clusters, and the canonical name for the first member of each.
     """
-    clusters: dict[str, list[str]] = {}
-    for name in names:
-        clusters.setdefault(mapping.get(name, name), []).append(name)
-    return [sorted(members) for _, members in sorted(clusters.items())]
+    by_canonical: dict[str, list[str]] = {}
+    for name in sorted(names):
+        by_canonical.setdefault(str(mapping.get(name, name)), []).append(name)
+
+    clusters: list[list[str]] = []
+    canonical: dict[str, str] = {}
+
+    for canonical_name, members in sorted(by_canonical.items()):
+        by_signature: dict[tuple[str, ...], list[str]] = {}
+        for member in members:
+            by_signature.setdefault(matching.digit_signature(member), []).append(member)
+
+        canonical_signature = matching.digit_signature(canonical_name)
+        for signature, safe_members in sorted(by_signature.items()):
+            group = sorted(safe_members)
+            clusters.append(group)
+            # The name belongs to one digit signature only. Giving it to the
+            # other halves of a refused merge renames p112 to p111 at the apply
+            # step, which is the merge the split just prevented.
+            if signature == canonical_signature:
+                canonical[group[0]] = canonical_name
+            else:
+                canonical[group[0]] = matching.rule_normalise(group[0]) or group[0]
+
+    return clusters, canonical
 
 
 def _merge_clusters_by_model(
@@ -358,13 +423,11 @@ def propose_csv(
         ValueError: If the column is not in the CSV.
     """
     path = Path(path)
-    df = pd.read_csv(path)
-    if column not in df.columns:
-        raise ValueError(
-            f"Column {column!r} not found in {path}. Available: {list(df.columns)}"
-        )
+    df = _read_csv(path, column)
 
-    names = df[column].dropna().astype(str).tolist()
+    # An empty cell is not a sample name. It carries no identity, and a group
+    # built from it would rename a row to nothing.
+    names = [value for value in df[column].tolist() if value.strip()]
     occurrences = {k: int(v) for k, v in pd.Series(names).value_counts().items()}
 
     result = propose(
@@ -447,20 +510,38 @@ def apply_mapping(
         )
 
     path = Path(resolved_data)
-    df = pd.read_csv(path)
-    if resolved_column not in df.columns:
+    df = _read_csv(path, resolved_column)
+
+    # The mapping was built from one column of one file. Applying it to a file
+    # that shares no name with it changes nothing, and the log still reports
+    # every name in the mapping as changed.
+    present = sum(1 for name in set(df[resolved_column]) if name in final_mapping)
+    if final_mapping and not present:
         raise ValueError(
-            f"Column {resolved_column!r} not found in {path}. Available: {list(df.columns)}"
+            f"No name of the mapping appears in column {resolved_column!r} of "
+            f"{path}. The mapping was built from {mapping.input_file!r}. "
+            f"Check the --data and --column options."
         )
 
     if canonical_column is None:
         canonical_column = f"{resolved_column}_canonical"
 
-    df[canonical_column] = df[resolved_column].map(
-        lambda x: final_mapping.get(str(x), x) if pd.notna(x) else x
-    )
+    if canonical_column == resolved_column:
+        raise ValueError(
+            f"The canonical column and the source column are both "
+            f"{resolved_column!r}. samplify writes the canonical name in a new "
+            f"column, so that the original spelling stays in the output."
+        )
+    if canonical_column in df.columns:
+        raise ValueError(
+            f"{path} already holds a column named {canonical_column!r}. "
+            f"Pass --canonical-column with another name, so that no column of "
+            f"the input is overwritten."
+        )
 
-    value_counts = df[resolved_column].astype(str).value_counts().to_dict()
+    df[canonical_column] = df[resolved_column].map(lambda x: final_mapping.get(x, x))
+
+    value_counts = df[resolved_column].value_counts().to_dict()
     changes = [
         {
             "original": original,
@@ -482,6 +563,10 @@ def apply_mapping(
             "unique_names": len(changes),
             "names_changed": names_changed,
             "names_unchanged": len(changes) - names_changed,
+            # The count of rows, which is what a person checks against the
+            # input. The counts above describe the mapping, and a mapping name
+            # that no row carries counts in them and changes nothing here.
+            "rows_changed": int((df[resolved_column] != df[canonical_column]).sum()),
         }
     )
 

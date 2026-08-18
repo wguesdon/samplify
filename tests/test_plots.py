@@ -82,3 +82,36 @@ def test_cli_reports_a_missing_matplotlib(tmp_path, monkeypatch, capsys):
     # The extra name has to survive the print. rich reads [plot] as a style tag.
     assert code == 1
     assert 'uv add "samplify[plot]"' in capsys.readouterr().out
+
+
+# ── The review findings of 2026-08-18 ──────────────────────────────────────
+
+
+def test_a_group_that_fits_is_kept_when_a_larger_one_does_not():
+    """A break dropped every group behind the first one that was too large."""
+    from samplify.plots import _ordered_names
+    from samplify.mapping import Group
+
+    def group(id_: int, members: list[str]) -> Group:
+        return Group(id=id_, members=members, proposed=members[0], final=members[0])
+
+    mapping = MappingFile(
+        groups=[
+            group(1, ["a_1", "a_2", "a_3"]),
+            group(2, ["b_1", "b_2", "b_3"]),
+            group(3, ["c_1"]),
+        ]
+    )
+    names, blocks = _ordered_names(mapping, limit=4)
+
+    # Group 2 does not fit behind group 1, and group 3 still does.
+    assert names == ["a_1", "a_2", "a_3", "c_1"]
+    assert len(blocks) == 2
+
+
+def test_the_heatmap_scores_the_value_that_decided_the_group():
+    """The panel showed the whole raw name, and the grouping used the letters."""
+    from samplify.plots import _similarity_matrix
+
+    matrix = _similarity_matrix(["patient11_batch2", "patient111_batch2"])
+    assert matrix[0][1] == 1.0

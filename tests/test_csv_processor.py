@@ -505,3 +505,112 @@ def test_auto_refuses_a_model_merge_across_two_numbers(tmp_path):
         "patient112_batch1",
     }
     assert mapping.collisions() == {}
+
+
+# ── The review findings of 2026-08-18 ──────────────────────────────────────
+
+
+def _accepted(path: Path, column: str = "sample_id") -> MappingFile:
+    result = propose_csv(path, column, method="damerau")
+    result.accept_all()
+    return result
+
+
+def test_zero_padding_survives_the_round_trip(tmp_path):
+    """pandas read 007 as the number 7 and wrote 7 back into the source column."""
+    source = tmp_path / "padded.csv"
+    source.write_text("sample_id,value\n007,1\n007,2\n008,3\n")
+
+    result = _accepted(source)
+    output = tmp_path / "out.csv"
+    apply_mapping(result, output_path=output)
+
+    written = pd.read_csv(output, dtype=str)
+    assert list(written["sample_id"]) == ["007", "007", "008"]
+
+
+def test_a_sample_named_na_is_kept(tmp_path):
+    """dropna deleted the sample, and apply wrote an empty cell in its place."""
+    source = tmp_path / "na.csv"
+    source.write_text("sample_id,value\nNA,1\nsample_1,2\n")
+
+    result = _accepted(source)
+    assert ["NA"] in [g.members for g in result.groups]
+
+    output = tmp_path / "out.csv"
+    apply_mapping(result, output_path=output)
+    written = pd.read_csv(output, dtype=str, keep_default_na=False)
+    assert list(written["sample_id"]) == ["NA", "sample_1"]
+
+
+def test_an_empty_cell_forms_no_group(tmp_path):
+    source = tmp_path / "blank.csv"
+    source.write_text("sample_id\n\nsample_1\n")
+
+    result = propose_csv(source, "sample_id", method="damerau")
+    assert [g.members for g in result.groups] == [["sample_1"]]
+
+
+def test_apply_refuses_the_source_column_as_the_canonical_column(tmp_path):
+    """This overwrote the original spelling, which apply must never do."""
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    result = _accepted(source)
+
+    with pytest.raises(ValueError, match="both"):
+        apply_mapping(result, canonical_column="sample_id")
+
+
+def test_apply_refuses_to_overwrite_an_existing_column(tmp_path):
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id,sample_id_canonical\nS1_B1,old\ns1-b1,old\n")
+    result = propose_csv(source, "sample_id", method="damerau")
+    result.accept_all()
+
+    with pytest.raises(ValueError, match="already holds a column"):
+        apply_mapping(result)
+
+
+def test_apply_refuses_a_csv_that_shares_no_name_with_the_mapping(tmp_path):
+    """Applying to the wrong file changed nothing and reported every name changed."""
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    result = _accepted(source)
+
+    other = tmp_path / "other.csv"
+    other.write_text("sample_id\nPATIENT_99\nX_1\n")
+
+    with pytest.raises(ValueError, match="No name of the mapping appears"):
+        apply_mapping(result, data_path=other, column="sample_id")
+
+
+def test_the_log_counts_the_rows_that_changed(tmp_path):
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\nsample1_batch1\n")
+    result = _accepted(source)
+
+    _, log = apply_mapping(result)
+    assert log["summary"]["rows_changed"] == 2
+    assert log["summary"]["total_rows"] == 3
+
+
+def test_a_duplicate_column_name_is_refused(tmp_path):
+    """pandas renames the second column, so half the names were invisible."""
+    source = tmp_path / "dup.csv"
+    source.write_text("sample_id,sample_id\nA_1,B_1\n")
+
+    with pytest.raises(ValueError, match="appears 2 times"):
+        propose_csv(source, "sample_id", method="damerau")
+
+
+def test_the_llm_backend_keeps_two_numbers_apart():
+    """The identity rule guarded the auto backend and not the llm backend."""
+    answer = {
+        "canonical_pattern": "patient<n>",
+        "mapping": {"p111": "patient111", "p112": "patient111"},
+    }
+    with patch("samplify.csv_processor.harmonize", return_value=answer):
+        result = propose(["p111", "p112"], method="llm", api_key="test")
+
+    assert [g.members for g in result.groups] == [["p111"], ["p112"]]
+    assert sorted(g.proposed for g in result.groups) == ["patient111", "patient112"]
