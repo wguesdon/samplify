@@ -112,3 +112,31 @@ def test_the_ordinary_paths_still_write(workspace):
     ]) == 0
     for name in ("clean.csv", "changes.csv", "changes.json"):
         assert (root / name).exists(), name
+
+
+@pytest.mark.parametrize(
+    "alias",
+    ["the same path", "a dot segment", "a parent segment", "a doubled separator"],
+)
+def test_every_spelling_of_one_path_is_the_same_file(workspace, alias):
+    """A path has many spellings, and each one reaches the same bytes."""
+    from samplify.csv_processor import is_the_same_file
+
+    root: Path = workspace["root"]
+    data: Path = workspace["data"]
+    (root / "sub").mkdir(exist_ok=True)
+
+    candidates = {
+        "the same path": data,
+        "a dot segment": root / "." / data.name,
+        "a parent segment": root / "sub" / ".." / data.name,
+        "a doubled separator": Path(f"{root}//{data.name}"),
+    }
+    assert is_the_same_file(candidates[alias], data)
+
+
+def test_a_different_file_is_not_the_same_file(workspace):
+    from samplify.csv_processor import is_the_same_file
+
+    assert not is_the_same_file(workspace["root"] / "other.csv", workspace["data"])
+    assert not is_the_same_file(workspace["mapping"], workspace["data"])
