@@ -271,7 +271,11 @@ One inserted letter, one deleted letter or one exchange of two letters therefore
 matches at every ratio. One keystroke makes each of those three faults.
 
 That rule holds from five letters up, and `MIN_SLIP_LENGTH` in
-`src/samplify/matching.py` holds the limit. Below five letters the same edit
+`src/samplify/matching.py` holds the limit. The value is measured. Eleven pairs
+in the reference corpus turn on this rule alone, their shortest skeletons run
+from one letter to four, and every one of the eleven is two different samples.
+Five is the smallest value that refuses all eleven, and no pair of five letters
+or more in that corpus turns on the rule at all. Below five letters the same edit
 separates two real terms. The pair `wt` and `wnt` is wildtype and the Wnt gene
 family, the pair `t` and `tp` is a treatment and a timepoint, and the pair `k`
 and `ko` is a plate letter and a knockout. A short pair therefore has to clear
@@ -525,7 +529,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 453 offline tests, no key and no server
+uv run pytest                 # 462 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

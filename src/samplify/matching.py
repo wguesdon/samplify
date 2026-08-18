@@ -63,6 +63,16 @@ _DIGIT_RUN = re.compile(r"\d+")
 #: family, ``t`` and ``tp`` are a treatment and a timepoint, and ``k`` and
 #: ``ko`` are a plate letter and a knockout. A short name therefore has to
 #: clear the ratio like any other pair.
+#:
+#: The value is measured and not chosen. Eleven pairs in the reference corpus
+#: turn on this rule alone, which means the ratio refuses them and only the
+#: rule can join them. Their shortest skeletons run from 1 to 4 letters, and
+#: every one of the eleven is two different samples: ``KMM-1`` against ``MM1``
+#: are two myeloma cell lines, ``SMB`` against ``USMB`` differ by a prefix, and
+#: ``CPT2`` against ``CPT2-H`` differ by a condition. Five is therefore the
+#: smallest value that refuses all eleven. No pair of five letters or more in
+#: that corpus turns on the rule, so a larger value would change nothing there
+#: and would only give up the short typing errors the rule exists for.
 MIN_SLIP_LENGTH = 5
 
 #: The most edits that samplify accepts between the letters of two names it

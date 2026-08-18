@@ -852,3 +852,44 @@ def test_padding_falls_away_when_a_letter_follows_the_number():
         ["sample_9a"],
         ["sample_9b"],
     ]
+
+
+# ── The value of MIN_SLIP_LENGTH, measured against the reference corpus ────
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ("3C1", "3SC1"),            # PRJDB10263
+        ("NT2", "NT2-H"),           # PRJDB13884
+        ("KMM-1", "MM1"),           # PRJDB3120, two myeloma cell lines
+        ("CPT2", "CPT2-H"),         # PRJDB13884
+        ("SMB", "USMB"),            # PRJDB15836
+        ("GEV-006_1", "GEV-006_F1"),  # PRJEB55162
+        ("HD-006_FH", "HD-006_H"),  # PRJEB55162
+        ("CPT2-H", "CPT2-HA"),      # PRJDB13884
+    ],
+)
+def test_the_pairs_that_set_the_slip_length_stay_apart(left, right):
+    """Every pair in the corpus that turns on the slip rule alone.
+
+    The ratio refuses each of these, so only the rule could join them, and each
+    one is two different samples. Their shortest skeletons run from one letter
+    to four, which is why the limit is five.
+    """
+    assert min(
+        len(matching.letter_skeleton(left)), len(matching.letter_skeleton(right))
+    ) < matching.MIN_SLIP_LENGTH
+    assert len(matching.group_names([left, right], method="damerau")) == 2
+
+
+def test_a_shorter_limit_would_merge_them():
+    """The limit is the smallest value that refuses all of them.
+
+    This test fails if someone lowers MIN_SLIP_LENGTH, and it says why.
+    """
+    assert matching.MIN_SLIP_LENGTH == 5
+    assert matching.describe_difference("SMB", "USMB") in matching.SLIP_KINDS
+    assert matching.similarity(
+        matching.letter_skeleton("SMB"), matching.letter_skeleton("USMB")
+    ) < 0.85

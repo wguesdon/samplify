@@ -13,6 +13,25 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.11.5] - 2026-08-19
+
+### Changed
+
+- `MIN_SLIP_LENGTH` is measured rather than chosen. It was set to five from
+  three hand-picked examples. Eleven pairs in the reference corpus turn on that
+  rule alone, which means the ratio refuses them and only the rule could join
+  them. Their shortest skeletons run from one letter to four, and every one of
+  the eleven is two different samples: `KMM-1` against `MM1` are two myeloma
+  cell lines, `SMB` against `USMB` differ by a prefix, and `CPT2` against
+  `CPT2-H` differ by a condition. Five is the smallest value that refuses all
+  eleven, and no pair of five letters or more in that corpus turns on the rule
+  at all. The value does not change, and it now rests on the measurement.
+
+### Added
+
+- A test for each of the eight readable pairs above, and a test that fails if
+  the limit is lowered and that says why.
+
 ## [0.11.4] - 2026-08-18
 
 The twentieth review reported that it found no major defect. That is the second
