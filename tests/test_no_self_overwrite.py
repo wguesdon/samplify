@@ -165,3 +165,36 @@ def test_a_directory_alias_of_the_input_is_the_input(tmp_path, capsys):
     assert code == 1
     assert "no output over" in " ".join(capsys.readouterr().out.split())
     assert data.read_bytes() == before
+
+
+def test_every_call_that_writes_a_file_has_a_guarded_destination():
+    """An inventory, so that a new write cannot be added without one.
+
+    Six calls in the package write a file. Each destination is either checked
+    against every input of its command, or it is the mapping file that `review`
+    was given, which is what that command exists to change.
+    """
+    import ast
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parent.parent / "src" / "samplify"
+    found = []
+    for module in sorted(source.glob("*.py")):
+        tree = ast.parse(module.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+            if name in ("to_csv", "savefig", "replace") or (
+                name == "open" and len(node.args) > 1
+            ):
+                found.append(f"{module.name}:{name}")
+
+    assert sorted(found) == sorted([
+        "csv_processor.py:to_csv",   # the output CSV
+        "csv_processor.py:to_csv",   # the change log
+        "csv_processor.py:open",     # the JSON log
+        "mapping.py:open",           # the mapping file, through a temporary one
+        "mapping.py:replace",        # the same, put in place
+        "plots.py:savefig",          # the figure
+    ]), found

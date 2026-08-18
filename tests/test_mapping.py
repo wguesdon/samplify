@@ -347,7 +347,7 @@ def test_a_group_id_that_is_not_a_number_is_refused(identifier):
         "final": "a1",
         "status": STATUS_ACCEPTED,
     }
-    with pytest.raises(ValueError, match="An id must be a number"):
+    with pytest.raises(ValueError, match="An id must be a whole number"):
         Group.from_dict(document)
 
 
@@ -444,9 +444,9 @@ def test_validate_checks_the_id_as_the_file_reader_does():
     """
     group = Group(id=True, members=["a_1"], proposed="a1", final="a1",
                   status=STATUS_ACCEPTED)
-    with pytest.raises(ValueError, match="An id must be a number"):
+    with pytest.raises(ValueError, match="An id must be a whole number"):
         group.validate()
-    with pytest.raises(ValueError, match="An id must be a number"):
+    with pytest.raises(ValueError, match="An id must be a whole number"):
         group.resolved()
 
 
@@ -652,3 +652,25 @@ def test_a_near_miss_pair_holds_two_names(pairs):
     TypeError from `samplify plot` rather than refusing the file."""
     with pytest.raises(ValueError, match="pair of names"):
         MappingFile.from_dict({"schema_version": 1, "groups": [], "near_misses": pairs})
+
+
+@pytest.mark.parametrize("identifier", [1.5, -0.5, 2.75])
+def test_a_fractional_group_id_is_refused(identifier):
+    """`int(1.5)` is 1, so a fractional id became a whole one and the log
+    recorded a group that the file never named."""
+    document = {
+        "id": identifier, "members": ["a_1"], "proposed": "a1", "final": "a1",
+        "status": STATUS_ACCEPTED,
+    }
+    with pytest.raises(ValueError, match="whole number"):
+        Group.from_dict(document)
+
+
+@pytest.mark.parametrize("identifier,expected", [(3, 3), (3.0, 3), ("3", 3), (-2, -2)])
+def test_a_whole_number_is_read_however_it_is_written(identifier, expected):
+    """JSON has one number type, so 3 and 3.0 are the same id."""
+    group = Group.from_dict(
+        {"id": identifier, "members": ["a_1"], "proposed": "a1", "final": "a1",
+         "status": STATUS_ACCEPTED}
+    )
+    assert group.id == expected

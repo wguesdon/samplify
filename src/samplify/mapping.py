@@ -98,8 +98,9 @@ class Group:
         """
         if isinstance(self.id, bool) or not isinstance(self.id, int):
             raise ValueError(
-                f"A group has the id {self.id!r}. An id must be a number. "
-                f"bool is a subclass of int in Python, so true is refused too."
+                f"A group has the id {self.id!r}. An id must be a whole "
+                f"number. bool is a subclass of int in Python, so true is "
+                f"refused too, and int(1.5) is 1 so a fraction is as well."
             )
         if not isinstance(self.members, list):
             raise ValueError(
@@ -219,16 +220,18 @@ class Group:
         # int(None) raises a TypeError, and this class documents ValueError.
         # A bool is refused first, because bool is a subclass of int in Python
         # and int(True) is 1, so a group with the id true became group 1.
-        if isinstance(data["id"], bool) or data["id"] is None:
+        identifier = data["id"]
+        if isinstance(identifier, str) and identifier.strip().lstrip("-").isdecimal():
+            identifier = int(identifier)
+        if isinstance(identifier, float) and identifier.is_integer():
+            identifier = int(identifier)
+        if isinstance(identifier, bool) or not isinstance(identifier, int):
+            # int(1.5) is 1, so a fractional id became a whole one and the log
+            # recorded a group that the file never named.
             raise ValueError(
-                f"A group has the id {data['id']!r}. An id must be a number."
+                f"A group has the id {data['id']!r}. An id must be a whole "
+                f"number."
             )
-        try:
-            identifier = int(data["id"])
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"A group has the id {data['id']!r}. An id must be a number."
-            ) from None
 
         group = cls(
             id=identifier,

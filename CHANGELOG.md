@@ -13,6 +13,25 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.11.4] - 2026-08-18
+
+The twentieth review reported that it found no major defect. That is the second
+pass in a row to say so since the last major finding, and the loop stops here.
+
+### Fixed
+
+- A fractional group id is refused. `int(1.5)` is 1, so the id became a whole
+  number and the log recorded a group that the file never named. JSON holds one
+  number type, so `3` and `3.0` are still read as the same id.
+
+### Added
+
+- An inventory test of every call in the package that writes a file. Six calls
+  write one, and each destination is either checked against every input of its
+  command or is the mapping file that `review` was given, which is what that
+  command exists to change. A new write cannot be added without a guard and a
+  line in that test.
+
 ## [0.11.3] - 2026-08-18
 
 The nineteenth review reported that no finding is major.
