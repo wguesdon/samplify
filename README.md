@@ -22,7 +22,7 @@ error. The row count drops and the counts disagree, but no message names the
 cause.
 
 samplify never merges two names with different numbers, because the numbers
-identify the sample. Six backends form the groups, and four of them make no
+identify the sample. Four backends form the groups, and two of them make no
 network call. The default backend is `auto`, and it calls a model only when the
 offline pass finds an inconsistency or forms a cluster. That model is a hosted
 one through OpenRouter, or a local one through ollama.

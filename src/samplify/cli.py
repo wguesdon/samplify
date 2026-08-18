@@ -507,7 +507,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     method_help = (
         "rules: character rules only, no model. "
-        "hamming or levenshtein: add typo tolerance, no model. "
+        "damerau: add typo tolerance, no model. "
         "llm: send every name to a model. "
         "auto: cluster offline, then send one name per cluster to a model."
     )

@@ -72,16 +72,27 @@ A rejection never deletes a row, and it never writes a null value.
 The file is text, it is small, and it stays the same between two runs. Commit the
 file with the analysis. A diff then shows the cleanup step.
 
-## The six backends
+## The four backends
 
 | Backend | What it finds | Model call |
 |---|---|---|
 | `rules` | Delimiter, letter case, zero-padding and abbreviation differences | None |
-| `hamming` | The same, plus a substituted character in a name of equal length | None |
-| `levenshtein` | The same, plus an inserted character or a deleted character | None |
-| `damerau` | The same, plus two adjacent characters in the wrong order | None |
-| `llm` | The names that the rules and the distances do not group | One call, all the names |
+| `damerau` | The same, plus one inserted, dropped or swapped letter | None |
+| `llm` | The names that the rules and the distance do not group | One call, all the names |
 | `auto` | Clusters offline first, then sends one name for each cluster | One call, few names |
+
+Version 0.7.0 held six. `hamming` and `levenshtein` were removed in 0.8.0,
+because the substitution rule left neither of them a job of its own. `hamming`
+finds a substituted character in a name of equal length and nothing else, and a
+substituted letter no longer merges, so it answered exactly as `rules` did.
+`levenshtein` and `damerau` differ only in what they charge for a transposition,
+and at a cap of one edit the slip rule decides that case for both, so it
+answered exactly as `damerau` did. A choice that does not change the answer is
+worse than no choice, because a person reads the name and believes it.
+
+`hamming_distance`, `levenshtein_distance` and `similarity` still take all three
+measures. The measures are correct and a caller may want them. It is the backend
+list that shrank.
 
 ### rules
 
@@ -111,14 +122,12 @@ timepoint at least as often as it is a treatment. A token that keeps its short
 form is easy to repair later. A token with the wrong expansion merges two
 samples, and the row count drops with no error.
 
-### hamming
+### The three measures
 
 Hamming distance counts the positions where two strings of equal length differ.
 It is the correct measure for a substituted character. It has no value for two
 names of different lengths, and `hamming_distance` then returns `None`. A number
 in that condition misleads the caller.
-
-### levenshtein
 
 Levenshtein distance counts the insertions, the deletions and the substitutions.
 It also accepts two names of different lengths, and Hamming distance does not.

@@ -648,3 +648,38 @@ def test_padding_behind_a_symbol_reads_as_formatting():
     """
     assert matching.describe_difference("malaria5#02", "malaria5#2") == "formatting only"
     assert len(matching.group_names(["malaria5#02", "malaria5#2"], method="damerau")) == 1
+
+
+# ── The backend list holds no dead alias ───────────────────────────────────
+
+
+def test_only_the_backends_that_change_the_answer_are_offered():
+    """A choice that does not change the answer is worse than no choice.
+
+    hamming found a substituted character and nothing else, and a substitution
+    no longer merges, so it answered as rules did. levenshtein and damerau
+    differ only over a transposition, and the slip rule decides that for both.
+    """
+    assert matching.OFFLINE_METHODS == ("rules", "damerau")
+    assert matching.METHODS == ("rules", "damerau", "llm", "auto")
+
+    with pytest.raises(ValueError, match="Unknown offline method"):
+        matching.group_names(["a_1"], method="hamming")
+    with pytest.raises(ValueError, match="Unknown offline method"):
+        matching.group_names(["a_1"], method="levenshtein")
+
+
+def test_the_two_backends_do_not_answer_alike():
+    """Each remaining backend has to earn its place in the list."""
+    typo = ["patietn1_batch1", "patient1_batch1"]
+    assert len(matching.group_names(typo, method="rules")) == 2
+    assert len(matching.group_names(typo, method="damerau")) == 1
+
+
+def test_the_three_measures_are_still_public():
+    """Only the backend list shrank. The measures are correct and stay."""
+    assert matching.hamming_distance("patient1", "patient2") == 1
+    assert matching.levenshtein_distance("patient", "patietn") == 2
+    assert matching.damerau_levenshtein_distance("patient", "patietn") == 1
+    assert matching.similarity("abc", "abd", method="hamming") > 0.6
+    assert matching.similarity("abc", "abd", method="levenshtein") > 0.6

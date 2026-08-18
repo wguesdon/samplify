@@ -205,10 +205,10 @@ def propose(
     Args:
         names: The raw sample names. Duplicates are collapsed.
         method: One of :data:`samplify.matching.METHODS`. ``"rules"`` applies
-            the character-level rules only. ``"hamming"`` and ``"levenshtein"``
-            add typo tolerance. ``"llm"`` sends every name to a model.
-            ``"auto"`` clusters offline first and then sends one representative
-            per cluster to the model, which keeps the request small.
+            the character-level rules only. ``"damerau"`` adds typo tolerance.
+            ``"llm"`` sends every name to a model. ``"auto"`` clusters offline
+            first and then sends one representative per cluster to the model,
+            which keeps the request small.
         threshold: The lowest similarity that still counts as a match, for the
             distance backends.
         occurrences: How many rows carry each name.

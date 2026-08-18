@@ -1,9 +1,9 @@
 """Deterministic matching of sample names, with no model call.
 
-Three of the four backends in samplify run here. The ``rules`` backend applies
-the character-level rules in :mod:`samplify.rules`. The ``hamming`` and
-``levenshtein`` backends group names that survive those rules but still differ,
-which is what a typo produces.
+Both offline backends run here. The ``rules`` backend applies the
+character-level rules in :mod:`samplify.rules`. The ``damerau`` backend also
+groups names that survive those rules but still differ by one keystroke, which
+is what a typing error produces.
 
 The identity guard
 ------------------
@@ -26,7 +26,20 @@ from collections import Counter
 from . import rules
 
 #: Backends that need no API key.
-OFFLINE_METHODS = ("rules", "hamming", "levenshtein", "damerau")
+#:
+#: Version 0.7.0 stopped merging on a substituted letter, and that removed the
+#: reason for two of the four backends that used to be here. ``hamming`` finds a
+#: substituted character in a name of equal length and nothing else, so it
+#: became a second name for ``rules``. ``levenshtein`` and ``damerau`` differ
+#: only in what they charge for a transposition, and at a cap of one edit the
+#: slip rule decides that case for both, so it became a second name for
+#: ``damerau``. A choice that does not change the answer is worse than no
+#: choice, because a person reads the name and believes it.
+#:
+#: :func:`hamming_distance`, :func:`levenshtein_distance` and
+#: :func:`similarity` still take all three measures. The measures are correct
+#: and a caller may want them. It is the backend list that shrank.
+OFFLINE_METHODS = ("rules", "damerau")
 
 #: Every backend the CLI accepts.
 METHODS = OFFLINE_METHODS + ("llm", "auto")
@@ -460,8 +473,7 @@ def group_names(
     Args:
         names: The unique raw sample names.
         method: ``"rules"`` for exact agreement after normalisation, or
-            ``"damerau"``, ``"levenshtein"`` or ``"hamming"`` for typo
-            tolerance.
+            ``"damerau"`` for typo tolerance.
         threshold: The lowest similarity that still counts as a match. Ignored
             by the ``"rules"`` method.
 
@@ -570,10 +582,9 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     to clear the ratio like any other. ``wt`` and ``wnt`` differ by one inserted
     letter and they are wildtype and the Wnt gene family.
 
-    A single substituted letter never gets that treatment, and must clear the
-    ratio instead. A substitution is the one edit that also carries meaning.
-    Cohorts label replicates ``sample1a`` and ``sample1b``, and those two names
-    differ by exactly one substituted letter.
+    A single substituted letter never merges two names at all. It is the one
+    edit that also carries meaning, and :func:`find_letter_variants` reports the
+    pair instead.
 
     Args:
         a: The first name.
@@ -606,13 +617,7 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     # cap says so at every length. A ratio cannot, because it scales with the
     # length: EVT-TS-1_paired-RNA and ST-TS-1_paired-RNA are two cell types,
     # they are two edits apart and they score 0.857.
-    if method == "hamming":
-        distance = hamming_distance(left, right)
-        if distance is None:
-            return False
-    else:
-        distance = damerau_levenshtein_distance(left, right, max_distance=MAX_TYPO_EDITS)
-    if distance > MAX_TYPO_EDITS:
+    if damerau_levenshtein_distance(left, right, max_distance=MAX_TYPO_EDITS) > MAX_TYPO_EDITS:
         return False
 
     # A substituted letter never merges on its own. It is the one edit that
@@ -625,11 +630,7 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     if difference == "substitution":
         return False
 
-    if (
-        method != "hamming"
-        and min(len(left), len(right)) >= MIN_SLIP_LENGTH
-        and difference in SLIP_KINDS
-    ):
+    if min(len(left), len(right)) >= MIN_SLIP_LENGTH and difference in SLIP_KINDS:
         return True
 
     return similarity(left, right, method=method) >= threshold

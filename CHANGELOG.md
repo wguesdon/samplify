@@ -13,6 +13,23 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.8.0] - 2026-08-18
+
+### Removed
+
+- The `hamming` and `levenshtein` backends. The substitution rule of 0.7.0 left
+  neither of them a job of its own. `hamming` finds a substituted character in a
+  name of equal length and nothing else, and a substituted letter no longer
+  merges, so it answered exactly as `rules` did. `levenshtein` and `damerau`
+  differ only in what they charge for a transposition, and at a cap of one edit
+  the slip rule decides that case for both, so it answered exactly as `damerau`
+  did. A choice that does not change the answer is worse than no choice, because
+  a person reads the name and believes it. `-M hamming` and `-M levenshtein` now
+  fail with the list of the four that remain.
+- `hamming_distance`, `levenshtein_distance` and `similarity` are unchanged and
+  still take all three measures. The measures are correct and a caller may want
+  them. It is the backend list that shrank.
+
 ## [0.7.0] - 2026-08-18
 
 ### Fixed
