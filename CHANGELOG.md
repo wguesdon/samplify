@@ -13,6 +13,16 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.3] - 2026-08-18
+
+### Fixed
+
+- `samplify plot` reports a figure it cannot write instead of raising a
+  traceback. It caught `ImportError` for the missing matplotlib and nothing
+  else, so a directory that does not exist, a full disk or a path with no write
+  permission all reached the user as a stack trace. The figure is written last,
+  so the traceback also hid the fact that the proposal itself had succeeded.
+
 ## [0.9.2] - 2026-08-18
 
 ### Fixed

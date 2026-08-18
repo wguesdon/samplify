@@ -284,6 +284,12 @@ def _write_plot(result: MappingFile, path: str, title: str | None = None, dpi: i
     except ImportError as exc:
         _print_error(exc)
         return 1
+    except OSError as exc:
+        # A directory that does not exist, a full disk or a path with no write
+        # permission. The figure is written last, so a traceback here also hid
+        # the fact that the proposal itself had succeeded.
+        _print_error(f"The figure could not be written to {path}: {exc}")
+        return 1
 
     console.print(f"[green]QC figure written to {path}[/green]")
     return 0

@@ -125,3 +125,16 @@ def test_the_heatmap_scores_the_value_that_decided_the_group():
     # One signature, one dropped letter. This is the pair that merged.
     compared = _similarity_matrix(["patient1_batch1", "patietn1_batch1"])
     assert 0.85 < compared[0][1] < 1.0
+
+
+def test_a_figure_that_cannot_be_written_gives_an_error_not_a_traceback(tmp_path, capsys):
+    """A directory that does not exist reached the user as a FileNotFoundError.
+
+    The figure is written last, so the traceback also hid the fact that the
+    proposal itself had succeeded.
+    """
+    mapping = propose_csv(EXAMPLE_DIR / "typos.csv", "sample_id", method="damerau")
+    code = cli._write_plot(mapping, str(tmp_path / "no_such_directory" / "qc.png"))
+
+    assert code == 1
+    assert "could not be written" in capsys.readouterr().out
