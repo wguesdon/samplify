@@ -110,8 +110,18 @@ def test_a_group_that_fits_is_kept_when_a_larger_one_does_not():
 
 
 def test_the_heatmap_scores_the_value_that_decided_the_group():
-    """The panel showed the whole raw name, and the grouping used the letters."""
+    """The panel showed the whole raw name, which took no part in the decision.
+
+    The decision is a conjunction. A pair whose numbers differ was never
+    compared, whatever its letters look like, and a pair inside one signature
+    was decided on its letters alone.
+    """
     from samplify.plots import _similarity_matrix
 
-    matrix = _similarity_matrix(["patient11_batch2", "patient111_batch2"])
-    assert matrix[0][1] == 1.0
+    # Identical letters, different numbers. The identity rule refused this pair.
+    blocked = _similarity_matrix(["patient11_batch2", "patient111_batch2"])
+    assert blocked[0][1] == 0.0
+
+    # One signature, one dropped letter. This is the pair that merged.
+    compared = _similarity_matrix(["patient1_batch1", "patietn1_batch1"])
+    assert 0.85 < compared[0][1] < 1.0

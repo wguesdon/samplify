@@ -107,11 +107,14 @@ def _ordered_names(mapping: MappingFile, limit: int) -> tuple[list[str], list[tu
 def _similarity_matrix(names: list[str]) -> list[list[float]]:
     """Build the pairwise similarity matrix for a list of names.
 
-    The score compares the letter skeletons, which is the value that decided
-    each group. Scoring the whole raw name showed a person a measure that took
-    no part in the decision. It also makes the near misses visible: a pair with
-    identical letters and different numbers reads 1.0 and carries no outline,
-    which is the reason samplify refused to merge it.
+    The cell holds the value that decided the group, which is a conjunction of
+    two rules. A pair whose digit signatures differ was never compared, so it
+    scores 0.0 whatever its letters look like. A pair inside one signature
+    scores the similarity of the two letter skeletons.
+
+    Version 0.3.0 scored the whole raw name. That measure took no part in the
+    decision, and it painted a pair that the identity rule had refused in the
+    same colour as a pair that samplify had merged.
 
     Args:
         names: The names, already in display order.
@@ -120,9 +123,15 @@ def _similarity_matrix(names: list[str]) -> list[list[float]]:
         A square matrix of similarities between 0.0 and 1.0.
     """
     skeletons = [matching.letter_skeleton(n) for n in names]
+    signatures = [matching.digit_signature(n) for n in names]
     return [
-        [matching.similarity(a, b, method=matching.DEFAULT_DISTANCE) for b in skeletons]
-        for a in skeletons
+        [
+            matching.similarity(a, b, method=matching.DEFAULT_DISTANCE)
+            if signature_a == signature_b
+            else 0.0
+            for b, signature_b in zip(skeletons, signatures)
+        ]
+        for a, signature_a in zip(skeletons, signatures)
     ]
 
 
@@ -171,8 +180,8 @@ def _panel_heatmap(ax: Any, mapping: MappingFile) -> None:
     shown = len(blocks)
     suffix = "" if shown == total else f", {shown} of {total} groups shown"
     ax.set_title(
-        f"Letter similarity, ordered by group{suffix}\n"
-        f"darker means more alike, and the numbers are not in this panel",
+        f"What decided each group, ordered by group{suffix}\n"
+        f"darker means the letters agree, and white means the numbers differ",
         fontsize=10,
         color=_COLOURS["text"],
     )

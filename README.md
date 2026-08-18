@@ -135,6 +135,11 @@ orders the similarity matrix on the left by group, so a block on the diagonal is
 one sample. The outline around a block shows the names that samplify proposes to
 merge, and the pair in red stays apart.
 
+The matrix holds the value that decided each group. A dark cell means the
+letters of the two names agree. A white cell means the numbers differ, so
+samplify never compared the pair, and the near-miss pair in the bottom corner
+reads white for that reason.
+
 The three panels on the right give the spellings per sample and the counts before
 and after the change. The last panel lists the names that need a decision and the
 reason for each name.

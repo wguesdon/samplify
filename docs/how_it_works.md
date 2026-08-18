@@ -85,7 +85,7 @@ file with the analysis. A diff then shows the cleanup step.
 
 ### rules
 
-The `rules` backend applies the character rules in `samplify/rules.py`. It does
+The `rules` backend applies the character rules in `src/samplify/rules.py`. It does
 five operations on each name.
 
 1. It changes every capital letter to a small letter, and it splits the name at
@@ -94,7 +94,9 @@ five operations on each name.
    abbreviation table as one token.
 3. It expands each abbreviation and removes the zero-padding from each number.
 4. It joins the tokens with an underscore.
-5. It removes each character outside the canonical set.
+5. It removes each character that is not a letter, a digit or an underscore.
+   A letter in any script survives, because it can carry the identity of the
+   sample.
 
 samplify puts two names in the same group when the two names normalise to the
 same string.
@@ -136,10 +138,14 @@ backend clusters the names offline first. It then sends one representative name
 for each cluster, so the request is much smaller. The `auto` backend makes no
 model call when the offline pass finds no inconsistency and forms no cluster.
 
-samplify checks each proposal from the model. If the model gives one canonical
-name to two representatives with different numbers, samplify keeps the two names
-apart. Each of the two then keeps its own canonical name. The model advises, and
-the identity rule decides.
+samplify checks each proposal from the model, and both backends apply the same
+check. If the model gives one canonical name to two names with different
+numbers, samplify keeps the two apart. Each of the two then keeps its own
+canonical name. The model advises, and the identity rule decides.
+
+Version 0.3.0 ran that check in the `auto` backend alone. The `llm` backend took
+the groups of the model as they came, so a model that gave one name to `p111`
+and to `p112` merged two patients.
 
 ### The two providers
 
@@ -177,6 +183,15 @@ substituted letter, and a distance backend merges them without this rule. The
 signature of `sample_9a` is `("9a",)` and the signature of `sample_9b` is
 `("9b",)`, so samplify never compares the pair.
 
+A letter counts in any script. An ASCII-only rule deletes the suffix of
+`sample_9α` and of `sample_9β`, and the two names then merge.
+
+A letter run with a digit behind it is not part of the signature, because it
+introduces the next number of the name. The `b` of `p1b1` is that kind of
+letter, so the signature of `p1b1` is `("1", "1")` and it agrees with the
+signature of `p1_b1`. The compact form and the delimited form of one name reach
+the same block for that reason.
+
 The rule has two effects. It keeps `p111` and `p112` in separate groups at every
 threshold. It also reduces the number of comparisons, because samplify measures
 only the names that share a signature.
@@ -189,6 +204,17 @@ one dropped letter.
 
 One inserted letter, one deleted letter or one exchange of two letters therefore
 matches at every ratio. One keystroke makes each of those three faults.
+
+That rule holds from five letters up, and `MIN_SLIP_LENGTH` in
+`src/samplify/matching.py` holds the limit. Below five letters the same edit
+separates two real terms. The pair `wt` and `wnt` is wildtype and the Wnt gene
+family, the pair `t` and `tp` is a treatment and a timepoint, and the pair `k`
+and `ko` is a plate letter and a knockout. A short pair therefore has to clear
+the ratio like any other pair, and `wt` against `wnt` scores 0.667.
+
+Two names with no letter at all never match. The ratio compares two empty
+strings and scores 1.0, which reads as agreement and is the absence of any
+evidence.
 
 One substituted letter does not match at every ratio, and it must be above the
 threshold. A substitution is the one edit that also changes the meaning. The
@@ -249,24 +275,52 @@ The result therefore never depends on the order of the input.
 
 ## The guards
 
-The `apply` command refuses to run in four conditions.
+The `apply` command refuses to run in seven conditions.
 
 1. A group still has the status `proposed`. No person made a decision, so
    samplify has nothing to apply.
-2. Two groups give one canonical name, and no person reviewed the file. samplify
-   put the names in two groups, so no person decided to merge them.
+2. Two groups give one name, and no person reviewed the file. samplify put the
+   names in two groups, so no person decided to merge them. A rejected group
+   counts here through its original names, because rejection keeps every member
+   as it was written.
 3. The caller gives no data file, and the mapping file records none.
 4. The caller gives no column, or the CSV holds no column with that name.
+5. The header of the CSV holds the column twice. pandas renames the second one,
+   so half the names would be invisible.
+6. The canonical column is the source column, or the CSV already holds a column
+   with the name of the canonical column. samplify writes the canonical name in
+   a new column, and it overwrites no column of the input.
+7. No name of the mapping appears in the column. The mapping belongs to another
+   file, and applying it would change nothing and report every name as changed.
 
 samplify merges the names inside one group, and that is not a collision. That
 operation is the purpose of the tool.
 
+The mapping file itself is guarded when it is read. A canonical name and a
+member name must be a string that holds a character, and the `reviewed` field
+must be a boolean. Both values were coerced in version 0.3.0. `str(None)` gives
+the string `None`, so a group carrying a null name renamed every member of a
+sample to those four characters, and `bool("false")` is True, so a file holding
+the string switched off the collision guard.
+
 ## Reproducibility
 
-The `apply` command makes no network call, writes no time value into its output
-and holds no random state. The same mapping file and the same input CSV give the
-same output CSV. The script `tests/smoke_test.sh` runs `apply` two times and
-compares the bytes.
+The `apply` command makes no network call and holds no random state. The same
+mapping file and the same input CSV give the same output CSV, byte for byte. The
+script `tests/smoke_test.sh` runs `apply` two times and compares the bytes.
+
+Every CSV is read as text. The default reader of pandas infers a type for each
+column, and both of its guesses destroy a sample name. It reads `007` as the
+number 7 and writes `7` back into the source column, and it reads a sample named
+`NA` as a missing value and deletes the row.
+
+The JSON log is not byte-for-byte reproducible, because it records the time of
+the run. That value describes the run and not the result. The output CSV holds
+no time value.
+
+The mapping file is written to a temporary file and then replaces the target in
+one operation. That file holds the decisions a person made, and a crash during a
+plain write leaves a truncated document and loses that work.
 
 The `propose` command calls the model with `temperature=0` when it calls a model.
 That value reduces the variation between two runs, but it does not remove the
@@ -281,11 +335,28 @@ The other three panels give the spellings per sample and the counts before and
 after the change. The last panel also lists the names that need a decision and
 the reason for each name.
 
-Two details of the figure are deliberate. The colour scale starts at the
+The matrix holds the value that decided each group, and that value is a
+conjunction of the two rules. A pair whose digit signatures differ was never
+compared, so it scores 0.0 whatever its letters look like. A pair inside one
+signature scores the similarity of the two letter skeletons. The pair
+`patient11_batch2` and `patient111_batch2` therefore reads white, and the last
+panel gives the reason in words.
+
+Version 0.3.0 scored the whole raw name. That measure took no part in the
+decision, and it painted a pair that the identity rule had refused in the same
+colour as a pair that samplify had merged.
+
+A group can hold two names whose cell is pale. `P1_B1` and `patient1_batch1`
+belong to one group, and their letter skeletons are `pb` and `patientbatch`. The
+group came from the normalisation rules and not from the ratio, and the outline
+around the block shows the group while the cells show the evidence.
+
+Two more details of the figure are deliberate. The colour scale starts at the
 twentieth percentile of the pairs in the data. Names that share a stem are all
 similar to each other, and a fixed scale from zero gives the whole panel one
 colour. samplify also limits the matrix to forty names, because more than forty
-labels are not readable. The title then gives the number of groups in the figure.
+labels are not readable. A group that does not fit is left out and the rest are
+drawn, and the title then gives the number of groups in the figure.
 
 matplotlib is an optional dependency. If matplotlib is absent, `samplify plot`
 prints the install command and exits with the status 1.
@@ -306,7 +377,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 160 offline tests, no key and no server
+uv run pytest                 # 196 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
@@ -332,9 +403,14 @@ no group mixes two different samples of the catalogue.
 - The names stay on the machine when the provider is `ollama`. The mapping file
   records which provider answered.
 - The `apply` command never calls a model.
-- samplify never overwrites the original column, and it writes the canonical name
-  in a new column.
+- samplify overwrites no column of the input. It writes the canonical name in a
+  new column, and it refuses to run when a column of that name already exists.
+- The input reaches the output as it was written. Every CSV is read as text, so
+  no type inference alters a value that samplify does not change itself.
 - A rejection keeps the original name, and it never writes a null value.
+- A guard reads a value that is not valid as a refusal and never as permission.
+  A name must be a string that holds a character, and `reviewed` must be a
+  boolean.
 - One rule table serves the model prompt and the offline backends.
-- The library returns data and the CLI prints it. `samplify/csv_processor.py`
+- The library returns data and the CLI prints it. `src/samplify/csv_processor.py`
   writes nothing to the console.
