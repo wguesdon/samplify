@@ -527,13 +527,17 @@ def apply_mapping(
     # is allowed to hold one, because a person signed for it, and it still has
     # to be said out loud.
     collisions = mapping.collisions()
-    if collisions and not mapping.reviewed:
+    # `is not True` and not `not ...`. Reading a file goes through a check that
+    # refuses anything but a boolean, and a caller building a MappingFile in
+    # Python does not. Every value except True is a refusal here, so the string
+    # "false" cannot switch the guard off by being truthy.
+    if collisions and mapping.reviewed is not True:
         detail = "; ".join(
             f"{name!r} from groups {ids}" for name, ids in list(collisions.items())[:5]
         )
         raise ValueError(
             f"{len(collisions)} canonical name(s) are produced by more than one group, "
-            f"and no person reviewed this mapping: {detail}. "
+            f"and this mapping records reviewed={mapping.reviewed!r}: {detail}. "
             f"Run 'samplify review' and decide, or edit the mapping file."
         )
 

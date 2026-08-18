@@ -13,6 +13,16 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.4] - 2026-08-18
+
+### Fixed
+
+- The collision guard reads `reviewed is not True` and no longer reads the
+  field for truthiness. Reading a mapping file refuses anything but a boolean,
+  and a caller building a `MappingFile` in Python does not go through that
+  check. The string `"false"` is truthy, so it switched the guard off and two
+  patients merged. Every value except `True` is now a refusal.
+
 ## [0.9.3] - 2026-08-18
 
 ### Fixed

@@ -187,8 +187,8 @@ types. Normalisation deleted a sign that identifies a sample, so `OVTOKO_DOX+`
 and `OVTOKO_DOX-` became one string. A substituted letter merged
 `Primary B cells` with `Primary T cells`.
 
-Version 0.7.0 proposes 32 merges on that corpus. Each of the 32 was read by
-hand and each is correct. Of the merges that later versions removed, all 30 of
+Version 0.7.0 brought the count to 32 merges on that corpus, and every version
+since has held it there. Each of the 32 was read by hand and each is correct. Of the merges that later versions removed, all 30 of
 the sign class and all 42 of the substitution class were read, and a sample of
 the 246 that the edit cap removed. Every one of them joined two different
 samples.

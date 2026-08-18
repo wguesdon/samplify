@@ -713,3 +713,52 @@ def test_the_log_holds_no_collision_when_there_is_none(tmp_path):
     mapping = _accepted(source)
     _, log = apply_mapping(mapping)
     assert log["collisions"] == {}
+
+
+@pytest.mark.parametrize("reviewed", ["false", "true", 1, [], None, 0])
+def test_only_a_real_true_lets_a_collision_through(tmp_path, reviewed):
+    """Reading a file refuses anything but a boolean, and the Python API cannot.
+
+    A MappingFile built in code carried the string "false", which is truthy, and
+    the collision guard read it as permission and merged two patients.
+    """
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\npatient11_batch1\npatient112_batch1\n")
+
+    mapping = MappingFile(
+        groups=[
+            mapping_module.Group(
+                id=1, members=["patient11_batch1"], proposed="one", final="one",
+                status="accepted", occurrences={"patient11_batch1": 1},
+            ),
+            mapping_module.Group(
+                id=2, members=["patient112_batch1"], proposed="one", final="one",
+                status="accepted", occurrences={"patient112_batch1": 1},
+            ),
+        ],
+        input_file=str(source), column="sample_id", reviewed=reviewed,
+    )
+
+    with pytest.raises(ValueError, match="more than one group"):
+        apply_mapping(mapping)
+
+
+def test_a_real_true_still_lets_a_collision_through(tmp_path):
+    """A person who signed for the merge is still obeyed."""
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\npatient11_batch1\npatient112_batch1\n")
+    mapping = MappingFile(
+        groups=[
+            mapping_module.Group(
+                id=1, members=["patient11_batch1"], proposed="one", final="one",
+                status="accepted", occurrences={"patient11_batch1": 1},
+            ),
+            mapping_module.Group(
+                id=2, members=["patient112_batch1"], proposed="one", final="one",
+                status="accepted", occurrences={"patient112_batch1": 1},
+            ),
+        ],
+        input_file=str(source), column="sample_id", reviewed=True,
+    )
+    _, log = apply_mapping(mapping)
+    assert log["collisions"] == {"one": [1, 2]}
