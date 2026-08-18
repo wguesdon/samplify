@@ -20,7 +20,7 @@ from typing import Any
 import pandas as pd
 
 from . import matching, rules
-from .harmonizer import DEFAULT_PROVIDER, harmonize, resolve_model
+from .harmonizer import DEFAULT_PROVIDER, harmonize, resolve_base_url, resolve_model
 from .mapping import Group, MappingFile
 
 
@@ -243,6 +243,7 @@ def propose(
     canonical_pattern = ""
     used_model: str | None = None
     used_provider: str | None = None
+    used_base_url: str | None = None
 
     if not unique:
         return MappingFile(groups=[], method=method, diagnosis=findings)
@@ -265,6 +266,7 @@ def propose(
         canonical_pattern = result.get("canonical_pattern", "")
         used_model = resolve_model(model, provider=provider)
         used_provider = provider
+        used_base_url = resolve_base_url(provider, base_url)
         clusters, canonical = _cluster_by_canonical(unique, result["mapping"])
         groups = _build_groups(clusters, occurrences, method, canonical=canonical)
 
@@ -292,6 +294,7 @@ def propose(
             canonical_pattern = result.get("canonical_pattern", "")
             used_model = resolve_model(model, provider=provider)
             used_provider = provider
+            used_base_url = resolve_base_url(provider, base_url)
             clusters, canonical = _merge_clusters_by_model(rep_to_cluster, result["mapping"])
             groups = _build_groups(clusters, occurrences, "auto", canonical=canonical)
 
@@ -300,6 +303,7 @@ def propose(
         method=method,
         model=used_model,
         provider=used_provider,
+        base_url=used_base_url,
         diagnosis=findings,
         near_misses=near_misses,
         canonical_pattern=canonical_pattern,

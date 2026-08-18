@@ -85,3 +85,39 @@ def test_the_review_step_asks_again_for_an_empty_canonical_name(tmp_path, monkey
     result = mapping_module.read(path)
     assert result.groups[0].final == "cohort_1"
     assert result.groups[0].status == STATUS_EDITED
+
+
+# ── The names must not leave the machine without a word ────────────────────
+
+
+def _propose_args(**overrides):
+    parser = cli.build_parser()
+    argv = ["propose", "data.csv", "-c", "sample_id", "-M", "auto"]
+    for flag, value in overrides.items():
+        argv += [f"--{flag.replace('_', '-')}", value]
+    return parser.parse_args(argv)
+
+
+def test_no_warning_when_the_model_runs_on_this_machine(capsys):
+    cli._warn_when_the_names_leave_this_machine(_propose_args(provider="ollama"))
+    assert capsys.readouterr().out == ""
+
+
+def test_a_warning_when_ollama_points_at_another_machine(capsys, monkeypatch):
+    """OLLAMA_HOST is an environment variable, so no option has to be typed."""
+    monkeypatch.setenv("OLLAMA_HOST", "otherbox:11434")
+    cli._warn_when_the_names_leave_this_machine(_propose_args(provider="ollama"))
+    # rich wraps the line, so the words are compared without the line breaks.
+    printed = " ".join(capsys.readouterr().out.split())
+    assert "otherbox" in printed
+    assert "not this machine" in printed
+
+
+def test_no_warning_when_no_model_is_called(capsys, monkeypatch):
+    monkeypatch.setenv("OLLAMA_HOST", "otherbox:11434")
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        ["propose", "data.csv", "-c", "sample_id", "-M", "damerau", "-p", "ollama"]
+    )
+    cli._warn_when_the_names_leave_this_machine(args)
+    assert capsys.readouterr().out == ""

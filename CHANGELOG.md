@@ -13,6 +13,23 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.0] - 2026-08-18
+
+### Fixed
+
+- samplify says where the sample names go before it sends them. `ollama` is the
+  private option because the model runs on this machine, and `OLLAMA_HOST` is an
+  environment variable that ollama itself uses. It can already be set on a
+  machine, so a person could send every sample name to another host without
+  typing an option and without reading a word about it. A sample name often
+  carries a patient identifier.
+- The mapping file records the address in a new `base_url` field, next to the
+  provider and the model. A person reading the file can now see that the names
+  left this machine. An older file has no such field and reads as `null`.
+- The README and `docs/how_it_works.md` said the names never leave the machine,
+  and then described the option that sends them elsewhere. Both now say that
+  the claim holds by default and what breaks it.
+
 ## [0.8.2] - 2026-08-18
 
 ### Fixed

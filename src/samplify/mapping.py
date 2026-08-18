@@ -182,6 +182,10 @@ class MappingFile:
         model: The model string, when a model was called.
         provider: The service that answered, when a model was called. It is
             ``"openrouter"`` or ``"ollama"``.
+        base_url: The server the names were sent to, when a model was called.
+            ``OLLAMA_HOST`` can point ollama at another machine, and a person
+            reading this file has to be able to see that the names left this
+            one.
         reviewed: True only when a person made the decisions.
         reviewed_at: When the review finished.
         created: When the file was written.
@@ -197,6 +201,7 @@ class MappingFile:
     column: str | None = None
     model: str | None = None
     provider: str | None = None
+    base_url: str | None = None
     reviewed: bool = False
     reviewed_at: str | None = None
     created: str = field(default_factory=_now)
@@ -301,6 +306,7 @@ class MappingFile:
             "method": self.method,
             "model": self.model,
             "provider": self.provider,
+            "base_url": self.base_url,
             "canonical_pattern": self.canonical_pattern,
             "reviewed": self.reviewed,
             "reviewed_at": self.reviewed_at,
@@ -368,6 +374,7 @@ class MappingFile:
             column=data.get("column"),
             model=data.get("model"),
             provider=data.get("provider"),
+            base_url=data.get("base_url"),
             reviewed=reviewed,
             reviewed_at=data.get("reviewed_at"),
             created=str(data.get("created", _now())),

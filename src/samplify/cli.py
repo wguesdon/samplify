@@ -35,6 +35,7 @@ from .harmonizer import (
     OLLAMA_BASE_URL,
     PROVIDERS,
     harmonize,
+    resolve_base_url,
 )
 from .mapping import (
     STATUS_ACCEPTED,
@@ -187,9 +188,35 @@ def _print_summary(mapping: MappingFile) -> None:
 # ── propose ────────────────────────────────────────────────────────────────
 
 
+def _warn_when_the_names_leave_this_machine(args: argparse.Namespace) -> None:
+    """Say so before a model call sends the sample names to another machine.
+
+    ``ollama`` is the private option, and it is private because the model runs
+    here. ``OLLAMA_HOST`` is an environment variable, so a person can redirect
+    every name to another host without typing an option and without reading a
+    word about it. Sample names carry patient identifiers often enough that
+    this has to be said out loud.
+
+    Args:
+        args: The parsed command line.
+    """
+    if args.method not in ("llm", "auto"):
+        return
+
+    url = resolve_base_url(args.provider, args.base_url)
+    if args.provider == "ollama" and not any(
+        host in url for host in ("localhost", "127.0.0.1", "[::1]")
+    ):
+        console.print(
+            f"[yellow]The sample names go to ollama at {escape(url)}, which is "
+            f"not this machine.[/yellow] The mapping file records that address."
+        )
+
+
 def _run_propose(args: argparse.Namespace) -> int:
     """Cluster the names in a CSV column and write a mapping file."""
     output = Path(args.output) if args.output else Path(f"{Path(args.file).stem}_mapping.json")
+    _warn_when_the_names_leave_this_machine(args)
 
     try:
         result = propose_csv(

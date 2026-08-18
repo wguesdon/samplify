@@ -51,7 +51,8 @@ OPENROUTER_MODEL=openai/gpt-4o-mini
 ## A local model with ollama
 
 The second service is [ollama](https://ollama.com), which runs the model on your
-own machine. It needs no key, and the sample names never leave the machine.
+own machine. It needs no key, and by default the sample names never leave the
+machine.
 
 ```bash
 ollama pull qwen3.5:9b
@@ -59,7 +60,10 @@ uv run samplify propose data.csv -c sample_id -M auto --provider ollama
 ```
 
 The option `--model` chooses another model. The option `--base-url` and the
-variable `OLLAMA_HOST` point at another machine. A local model on a CPU is
+variable `OLLAMA_HOST` point at another machine, and the names then go to that
+machine. `OLLAMA_HOST` is an environment variable, so it can already be set
+without you typing an option. samplify prints the address before it sends
+anything, and it records the address in the mapping file. A local model on a CPU is
 slower than a hosted one, so `--timeout` sets how long samplify waits, and the
 default is 300 seconds.
 

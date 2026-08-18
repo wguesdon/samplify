@@ -166,9 +166,18 @@ Two services answer the request of the `llm` and `auto` backends.
 | `openrouter` | The OpenRouter API | `OPENROUTER_API_KEY` | `openai/gpt-4o-mini` |
 | `ollama` | `http://localhost:11434` | None | `qwen3.5:9b` |
 
-The option `--provider ollama` runs the model on the local machine, so the names
-never leave it. `OLLAMA_HOST` and `--base-url` point at another machine, and
-`OLLAMA_MODEL` and `--model` choose the model.
+The option `--provider ollama` runs the model on the local machine, so by
+default the names never leave it. `OLLAMA_HOST` and `--base-url` point at
+another machine, and the names then go to that machine. `OLLAMA_MODEL` and
+`--model` choose the model.
+
+`OLLAMA_HOST` is an environment variable that ollama itself uses, so it can
+already be set on a machine before samplify runs, and a person can redirect
+every sample name to another host without typing an option. samplify therefore
+prints the address before it sends anything when the address is not this
+machine, and it records the address in the `base_url` field of the mapping
+file. A sample name often carries a patient identifier, so the record has to
+say where it went.
 
 samplify calls the native ollama endpoint rather than the OpenAI-compatible one,
 because only the native endpoint takes `format` and `think`. A model with the
