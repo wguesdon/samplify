@@ -110,6 +110,14 @@ MAX_TYPO_EDITS = 1
 #: that a plate row produces buries the two or three that matter. One study of
 #: the reference corpus, PRJEB20147, held 1351 plate wells and produced 1754
 #: such pairs.
+#:
+#: The value is measured and not chosen. In that corpus 1002 positions hold
+#: exactly two letters and 349 hold three or more. Every position of three or
+#: more that was read is a plate well or a replicate letter, such as
+#: ``RNA-seq_A549_24h_A01`` through ``D01``, which is a field of the scheme and
+#: not a typing error. The positions holding two letters carry the real
+#: contrasts, such as ``3C1`` against ``3N1``. Two is therefore the value that
+#: keeps the contrasts and drops the fields.
 MAX_VARIANT_LETTERS = 2
 
 #: The characters that identify a sample where they stand. A hyphen is here

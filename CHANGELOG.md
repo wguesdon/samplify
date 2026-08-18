@@ -27,10 +27,18 @@ a change that alters the grouping bumps the minor version until 1.0.0.
   eleven, and no pair of five letters or more in that corpus turns on the rule
   at all. The value does not change, and it now rests on the measurement.
 
+- `MAX_VARIANT_LETTERS` is measured rather than chosen, in the same way. In the
+  reference corpus 1002 positions hold exactly two letters and 349 hold three
+  or more. Every position of three or more that was read is a plate well or a
+  replicate letter, such as `RNA-seq_A549_24h_A01` through `D01`, and the
+  positions holding two letters carry the real contrasts, such as `3C1` against
+  `3N1`. Two is the value that keeps the contrasts and drops the fields, and it
+  does not change.
+
 ### Added
 
 - A test for each of the eight readable pairs above, and a test that fails if
-  the limit is lowered and that says why.
+  either limit is moved and that says why.
 
 ## [0.11.4] - 2026-08-18
 

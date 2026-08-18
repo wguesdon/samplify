@@ -330,6 +330,11 @@ corpus held 1351 wells and produced 1754 pairs without the rule.
 `MAX_VARIANT_LETTERS` holds the limit, and the rule matches the one that drops a
 number sitting inside a series.
 
+The limit is measured. In the reference corpus 1002 positions hold exactly two
+letters and 349 hold three or more. Every position of three or more that was
+read is a plate well or a replicate letter, and the positions holding two
+letters carry the real contrasts, such as `3C1` against `3N1`.
+
 ## Near misses
 
 A near miss is a pair that samplify keeps apart and that a person must still
@@ -529,7 +534,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 462 offline tests, no key and no server
+uv run pytest                 # 465 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

@@ -893,3 +893,28 @@ def test_a_shorter_limit_would_merge_them():
     assert matching.similarity(
         matching.letter_skeleton("SMB"), matching.letter_skeleton("USMB")
     ) < 0.85
+
+
+# ── The value of MAX_VARIANT_LETTERS, measured against the corpus ──────────
+
+
+def test_a_position_of_two_letters_carries_a_real_contrast():
+    """1002 positions in the corpus hold two letters, and they are contrasts."""
+    assert matching.find_letter_variants(["3C1", "3N1"]) == [("3C1", "3N1")]
+
+
+def test_a_position_of_more_letters_is_a_field_of_the_scheme():
+    """349 positions hold three or more, and every one read is a plate well.
+
+    These are the rows of one plate at one timepoint, from PRJDB6952.
+    """
+    plate = [f"RNA-seq_A549_24h_{row}01_DMSO_0.1" for row in "ABCD"]
+    assert matching.find_letter_variants(plate) == []
+
+    # Two of the same rows is a contrast again, and it is reported.
+    assert len(matching.find_letter_variants(plate[:2])) == 1
+
+
+def test_the_variant_limit_is_the_measured_one():
+    """This test fails if someone raises the limit, and it says why."""
+    assert matching.MAX_VARIANT_LETTERS == 2
