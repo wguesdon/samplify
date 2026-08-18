@@ -83,3 +83,24 @@ def test_the_same_mapping_and_input_give_the_same_output(tmp_path):
     apply_mapping(mapping, output_path=second)
 
     assert first.read_bytes() == second.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "names,label",
+    [
+        (["Th1", "Th17"], "two T helper subsets"),
+        (["MSI-1", "MSI-13"], "two samples of one series"),
+        (["human cTEC5", "human mTEC5"], "cortical against medullary"),
+        (["Primary B cells", "Primary T cells"], "two lymphocyte lineages"),
+        (["exp1-d4", "exp1-d14"], "day 4 against day 14"),
+    ],
+)
+def test_a_pair_that_needs_a_person_is_kept_apart_and_reported(names, label):
+    """Keeping two samples apart is half of the promise. Saying so is the other
+    half, because a pair nobody sees is a pair nobody decides.
+
+    Every one of these comes from the ENA archive.
+    """
+    assert len(matching.group_names(names, method="damerau")) == 2, label
+    reported = matching.find_near_misses(names) + matching.find_letter_variants(names)
+    assert reported, label
