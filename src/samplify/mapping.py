@@ -138,6 +138,10 @@ class Group:
         Raises:
             ValueError: If a required key is missing or a value is not valid.
         """
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"A group is an object. This one is a {type(data).__name__}."
+            )
         for key in ("id", "members", "proposed", "final", "status"):
             if key not in data:
                 raise ValueError(f"Group is missing the required key {key!r}.")
@@ -264,9 +268,21 @@ class MappingFile:
                 f"Run 'samplify review' first, or rerun propose with --yes."
             )
 
+        # Reading a mapping file refuses a name that two groups claim, and a
+        # caller that builds a MappingFile in Python does not go through that
+        # check. `dict.update` would let the last group win, so one group would
+        # decide the name of a sample and the other would be ignored in silence.
         result: dict[str, str] = {}
+        owner: dict[str, int] = {}
         for group in self.groups:
-            result.update(group.resolved())
+            for member, final in group.resolved().items():
+                if member in owner:
+                    raise ValueError(
+                        f"Name {member!r} appears in group {owner[member]} and "
+                        f"in group {group.id}. Every name belongs to one group."
+                    )
+                owner[member] = group.id
+                result[member] = final
         return result
 
     def collisions(self) -> dict[str, list[int]]:

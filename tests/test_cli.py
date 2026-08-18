@@ -145,3 +145,51 @@ def test_the_names_command_accepts_every_method_it_offers(monkeypatch, capsys):
     assert code == 1
     assert "No API key found" in printed
     assert "Unknown offline method" not in printed
+
+
+# ── The review command, driven through every answer ────────────────────────
+
+
+@pytest.mark.parametrize(
+    "answers,expected_statuses,expected_reviewed",
+    [
+        (["a", "a", "a"], {"accepted"}, True),
+        (["r", "r", "r"], {"rejected"}, True),
+        (["e", "a", "a"], {"edited", "accepted"}, True),
+        (["A"], {"accepted"}, True),
+        (["q"], {"proposed"}, False),
+    ],
+)
+def test_the_review_command_writes_what_the_person_answered(
+    tmp_path, monkeypatch, answers, expected_statuses, expected_reviewed
+):
+    """Every answer the command accepts, driven end to end.
+
+    The quit case must leave the file undecided, so that apply refuses it.
+    """
+    from samplify import mapping as mapping_module
+    from samplify.csv_processor import propose_csv
+
+    source = tmp_path / "in.csv"
+    source.write_text(
+        "sample_id\nS1_B1\ns1-b1\nP3_B2\np3-b2\nCTRL_rep1_b1\nctrl-r1-batch1\n"
+    )
+    path = tmp_path / "mapping.json"
+    mapping_module.write(propose_csv(source, "sample_id", method="damerau"), path)
+
+    stream = iter(answers)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli, "_review_group", lambda *a, **k: next(stream, "q"))
+    monkeypatch.setattr(cli.Prompt, "ask", lambda *a, **k: "typed_name")
+
+    assert cli.main(["review", str(path)]) == 0
+
+    result = mapping_module.read(path)
+    assert {g.status for g in result.groups} == expected_statuses
+    assert result.reviewed is expected_reviewed
+
+    if expected_reviewed:
+        assert result.final_mapping()
+    else:
+        with pytest.raises(ValueError, match="still proposed"):
+            result.final_mapping()

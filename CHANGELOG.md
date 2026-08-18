@@ -13,6 +13,21 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.8] - 2026-08-18
+
+A seventh review found two defects, both of them in the same place: the Python
+API was guarded less than the file reader.
+
+### Fixed
+
+- `final_mapping` refuses a name that two groups claim. Reading a mapping file
+  has always refused it, and a caller that builds a `MappingFile` in Python did
+  not go through that check. `dict.update` let the last group win, so one group
+  decided the name of the sample and the other was ignored in silence, and the
+  collision report stayed empty.
+- A `groups` entry that is not an object is refused with a `ValueError`.
+  `"groups": [null]` raised a `TypeError`, and the class documents `ValueError`.
+
 ## [0.9.7] - 2026-08-18
 
 ### Fixed

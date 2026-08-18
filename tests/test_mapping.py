@@ -372,3 +372,26 @@ def test_resolved_refuses_to_rename_a_member_to_nothing(final):
     group = Group(id=1, members=["a_1"], proposed="a1", final=final, status=STATUS_ACCEPTED)
     with pytest.raises(ValueError, match="would rename every member"):
         group.resolved()
+
+
+@pytest.mark.parametrize("entry", [None, "text", 7, []])
+def test_a_group_entry_that_is_not_an_object_is_refused(entry):
+    """`"groups": [null]` raised a TypeError, and this class documents ValueError."""
+    with pytest.raises(ValueError, match="A group is an object"):
+        MappingFile.from_dict({"schema_version": 1, "groups": [entry]})
+
+
+def test_a_name_claimed_by_two_groups_is_refused_in_memory():
+    """Reading a file refuses this, and building a MappingFile in Python did not.
+
+    `dict.update` let the last group win, so one group decided the name of the
+    sample and the other was ignored in silence.
+    """
+    result = MappingFile(
+        groups=[
+            _group(1, ["patient1_batch1"], "first", STATUS_ACCEPTED),
+            _group(2, ["patient1_batch1"], "second", STATUS_ACCEPTED),
+        ]
+    )
+    with pytest.raises(ValueError, match="belongs to one group"):
+        result.final_mapping()
