@@ -17,6 +17,8 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 ### Fixed
 
+- `propose` writes all of its files or none of them, in the same way. The
+  mapping file was written and then a figure with a bad path failed.
 - `apply` writes all of its files or none of them. Each destination is checked
   before the first one is written. The output CSV was written and then a log
   with a bad path failed, so the command reported an error and exited with the

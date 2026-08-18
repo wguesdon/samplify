@@ -230,6 +230,16 @@ def _run_propose(args: argparse.Namespace) -> int:
                 f"writes no output over its own input."
             )
             return 1
+        # Both destinations are checked before either is written. The mapping
+        # file was written and then a figure with a bad path failed, so the
+        # command reported an error while one of its files was on disk.
+        if not Path(destination).parent.is_dir():
+            _print_error(
+                f"{label} points into {Path(destination).parent}, which is not "
+                f"a directory that exists. samplify writes all of its files or "
+                f"none of them."
+            )
+            return 1
 
     try:
         result = propose_csv(

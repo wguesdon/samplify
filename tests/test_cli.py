@@ -237,3 +237,20 @@ def test_a_names_file_that_excel_wrote_is_read(tmp_path, capsys):
 def test_a_names_file_that_is_missing_still_says_so(tmp_path, capsys):
     assert cli.main(["names", "--file", str(tmp_path / "absent.txt")]) == 1
     assert "File not found" in " ".join(capsys.readouterr().out.split())
+
+
+def test_propose_writes_all_of_its_files_or_none_of_them(tmp_path, capsys):
+    """The mapping file was written and then a figure with a bad path failed,
+    so the command reported an error while one of its files was on disk."""
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+
+    code = cli.main([
+        "propose", str(source), "-c", "sample_id", "-M", "damerau", "--yes",
+        "-o", str(tmp_path / "mapping.json"),
+        "--plot", str(tmp_path / "absent" / "qc.png"),
+    ])
+
+    assert code == 1
+    assert "all of its files or none" in " ".join(capsys.readouterr().out.split())
+    assert not (tmp_path / "mapping.json").exists()

@@ -456,6 +456,10 @@ count, because a count goes stale and a list does not.
    every one of those checks, and both the file reader and a caller that builds
    a group in Python call it.
 
+A command writes all of its files or none of them. Every destination is
+checked before the first one is written, so an exit code of 1 means that
+nothing was written. `apply` writes three files and `propose` writes two.
+
 samplify merges the names inside one group, and that is not a collision. That
 operation is the purpose of the tool.
 
@@ -540,7 +544,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 488 offline tests, no key and no server
+uv run pytest                 # 489 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
