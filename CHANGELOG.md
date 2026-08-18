@@ -34,6 +34,12 @@ Two names that keep the same canonical name after all of that are two groups
 proposing one name, and `apply` refuses that in a mapping no person reviewed.
 The tool asks rather than joining them.
 
+### Added
+
+- A property test that asks the model to merge every name, and then to merge
+  none, over both model backends. Neither answer may lose a name from the file
+  a person reviews, and neither may put two identities in one group.
+
 ## [0.10.9] - 2026-08-18
 
 Found by sweeping every command with every malformed input myself.

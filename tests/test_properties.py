@@ -243,3 +243,41 @@ def test_no_combination_of_decisions_loses_a_row(names, decisions):
         assert list(written["sample_id"]) == names
         for value in written["sample_id_canonical"]:
             assert isinstance(value, str) and value.strip()
+
+
+# ── The model can neither lose a name nor mix two identities ───────────────
+
+
+@given(
+    names=name_lists,
+    method=st.sampled_from(["llm", "auto"]),
+    merge_all=st.booleans(),
+)
+@settings(max_examples=200, deadline=None)
+def test_no_model_answer_loses_a_name_or_mixes_two_identities(names, method, merge_all):
+    """The model is asked to merge everything, and then to merge nothing.
+
+    Neither answer may lose a name from the file a person reviews, and neither
+    may put two identities in one group. A dictionary of representatives once
+    dropped a whole cluster, and the offline rules once guarded only the
+    offline path.
+    """
+    from unittest.mock import patch
+
+    from samplify.csv_processor import propose
+
+    unique = sorted(set(names))
+    mapping = {name: "one_name" for name in unique} if merge_all else {}
+    answer = {"canonical_pattern": "", "mapping": mapping}
+
+    with patch("samplify.csv_processor.harmonize", return_value=answer):
+        result = propose(unique, method=method, api_key="test")
+
+    kept = sorted(member for group in result.groups for member in group.members)
+    assert kept == unique
+
+    for group in result.groups:
+        assert len({matching.digit_signature(m) for m in group.members}) == 1
+        for index, left in enumerate(group.members):
+            for right in group.members[index + 1:]:
+                assert matching.describe_difference(left, right) != "substitution"
