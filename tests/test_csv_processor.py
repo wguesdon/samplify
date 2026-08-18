@@ -818,3 +818,32 @@ def test_the_change_log_describes_what_the_output_did(tmp_path):
 
     rows_changed = int((written["sample_id"] != written["sample_id_canonical"]).sum())
     assert log["summary"]["rows_changed"] == rows_changed
+
+
+@pytest.mark.parametrize("option", ["output_path", "json_log_path", "csv_log_path"])
+def test_apply_writes_no_output_over_its_own_input(tmp_path, option):
+    """samplify promises that the input survives the run.
+
+    One character of a shell command separates `--output clean.csv` from
+    `--output data.csv`, and a log written over the input would lose the file
+    completely.
+    """
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    mapping = _accepted(source)
+
+    with pytest.raises(ValueError, match="which is the input"):
+        apply_mapping(mapping, **{option: source})
+
+    assert source.read_text() == "sample_id\nS1_B1\ns1-b1\n"
+
+
+def test_apply_writes_to_another_path_as_before(tmp_path):
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    mapping = _accepted(source)
+
+    output = tmp_path / "clean.csv"
+    apply_mapping(mapping, output_path=output, csv_log_path=tmp_path / "changes.csv")
+    assert output.exists()
+    assert source.read_text() == "sample_id\nS1_B1\ns1-b1\n"

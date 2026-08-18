@@ -13,6 +13,20 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.0] - 2026-08-18
+
+A ninth review found one defect.
+
+### Fixed
+
+- `apply` writes no output over its own input. `--output`, `--json-log` and
+  `--csv-log` are each refused when they point at the file the mapping was
+  built from. samplify promises that the input survives the run, so that a
+  person can read the original spelling after a decision they regret. One
+  character of a shell command separates `--output clean.csv` from
+  `--output data.csv`, and a log written over the input would lose the file
+  completely.
+
 ## [0.9.9] - 2026-08-18
 
 An eighth review found one defect, and it was the last of a class that seven

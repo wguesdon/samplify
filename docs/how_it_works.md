@@ -425,7 +425,10 @@ count, because a count goes stale and a list does not.
    file, and applying it would change nothing and report every name as changed.
 8. Two groups claim one name. One group would decide the name of that sample
    and the other would be ignored, so `final_mapping` refuses instead.
-9. A group holds a field that cannot decide a name. `Group.validate` holds
+9. An output path is the input path. samplify promises that the input survives
+   the run, and one character of a shell command separates `--output clean.csv`
+   from `--output data.csv`. A log written over the input would lose the file.
+10. A group holds a field that cannot decide a name. `Group.validate` holds
    every one of those checks, and both the file reader and a caller that builds
    a group in Python call it.
 
@@ -513,7 +516,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 310 offline tests, no key and no server
+uv run pytest                 # 314 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
