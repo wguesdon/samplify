@@ -66,6 +66,31 @@ _TIMEOUT_HELP = (
 # ── Rendering ──────────────────────────────────────────────────────────────
 
 
+def _ratio(value: str) -> float:
+    """Read a similarity threshold from the command line.
+
+    Args:
+        value: The text the caller typed.
+
+    Returns:
+        The value as a float.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a ratio. A similarity
+            is a ratio, so a value outside 0.0 to 1.0 either merges every name
+            that shares a digit signature or merges none of them.
+    """
+    try:
+        number = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a number.") from None
+    if not 0.0 <= number <= 1.0:
+        raise argparse.ArgumentTypeError(
+            f"{number} is not between 0.0 and 1.0."
+        )
+    return number
+
+
 def _print_error(message: object) -> None:
     """Print an error message in red.
 
@@ -306,7 +331,13 @@ def _run_review(args: argparse.Namespace) -> int:
             group.status = STATUS_REJECTED
             group.final = group.proposed
         elif answer == "e":
-            new_name = Prompt.ask("Canonical name", default=group.proposed)
+            # An empty answer renames every member of the sample to nothing,
+            # so ask again until the name holds a character.
+            new_name = ""
+            while not new_name:
+                new_name = Prompt.ask("Canonical name", default=group.proposed).strip()
+                if not new_name:
+                    console.print("[red]A canonical name must hold a character.[/red]")
             group.final = new_name
             group.status = STATUS_EDITED if new_name != group.proposed else STATUS_ACCEPTED
         elif answer == "A":
@@ -321,13 +352,6 @@ def _run_review(args: argparse.Namespace) -> int:
     if not result.pending():
         result.mark_reviewed()
 
-    collisions = result.collisions()
-    if collisions:
-        console.print(
-            f"[red]Warning:[/red] {len(collisions)} canonical name(s) come from "
-            f"more than one group: {', '.join(list(collisions)[:5])}."
-        )
-
     mapping_module.write(result, args.mapping)
     _print_summary(result)
     console.print(f"[green]Decisions saved to {args.mapping}[/green]")
@@ -335,6 +359,21 @@ def _run_review(args: argparse.Namespace) -> int:
         console.print(
             f"[yellow]{len(result.pending())} group(s) still have no decision. "
             f"apply will refuse until they do.[/yellow]"
+        )
+
+    # This warning comes last, because a reviewed file switches off the same
+    # check in apply. A person who typed one name for two groups must read it
+    # here, and it scrolled off the screen above the summary.
+    collisions = result.collisions()
+    if collisions:
+        detail = "; ".join(
+            f"{name} from groups {ids}" for name, ids in list(collisions.items())[:5]
+        )
+        console.print(
+            f"[red]Warning:[/red] {len(collisions)} name(s) come from more than "
+            f"one group: {detail}. Those samples join at the apply step. "
+            f"apply does not refuse a reviewed mapping, so correct the file now "
+            f"if that is not what you decided."
         )
     return 0
 
@@ -475,7 +514,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     propose_parser.add_argument(
         "--threshold",
-        type=float,
+        type=_ratio,
         default=0.85,
         help="Lowest similarity that still counts as a match (default: 0.85).",
     )
@@ -545,7 +584,9 @@ def build_parser() -> argparse.ArgumentParser:
         choices=list(matching.METHODS),
         help=method_help,
     )
-    names_parser.add_argument("--threshold", type=float, default=0.85, help="Match threshold.")
+    names_parser.add_argument(
+        "--threshold", type=_ratio, default=0.85, help="Match threshold."
+    )
     names_parser.add_argument("--model", "-m", default=None, help=_MODEL_HELP)
     names_parser.add_argument(
         "--provider", "-p", default=DEFAULT_PROVIDER, choices=list(PROVIDERS), help=_PROVIDER_HELP
