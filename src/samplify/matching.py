@@ -63,6 +63,11 @@ MIN_SLIP_LENGTH = 5
 #: this tool prefers. A wrong merge drops a row and reports nothing.
 MAX_TYPO_EDITS = 1
 
+#: The characters that identify a sample where they stand. A hyphen is here
+#: because :func:`samplify.rules.prepare` has already replaced every hyphen
+#: that separates two tokens, so any hyphen left is a sign.
+_SIGN_CHARACTERS = frozenset(rules.IDENTITY_SIGNS + "-")
+
 
 # ── String distances ───────────────────────────────────────────────────────
 
@@ -257,6 +262,10 @@ def digit_signature(name: str) -> tuple[str, ...]:
         The numbers found in the name, in order, each without leading zeros and
         each carrying the letters that identify it.
 
+    A sign that :mod:`samplify.rules` keeps also joins the signature, after the
+    numbers. ``dox+`` and ``dox-`` are the induced and the uninduced arm of one
+    experiment, and nothing else in the two names differs.
+
     Example:
         >>> digit_signature("p111-batch03")
         ('111', '3')
@@ -264,8 +273,10 @@ def digit_signature(name: str) -> tuple[str, ...]:
         ('9a',)
         >>> digit_signature("p1b1")
         ('1', '1')
+        >>> digit_signature("ovtoko_dox+_br1")
+        ('1', '+')
     """
-    lowered = name.lower()
+    lowered = rules.prepare(name)
     signature: list[str] = []
     index = 0
 
@@ -292,6 +303,10 @@ def digit_signature(name: str) -> tuple[str, ...]:
             index = letters_start
 
         signature.append((digits.lstrip("0") or "0") + suffix)
+
+    # The signs come after the numbers, so that adding one never moves the
+    # position of a number. The near-miss search reads a number by its position.
+    signature.extend(c for c in lowered if c in _SIGN_CHARACTERS)
 
     return tuple(signature)
 

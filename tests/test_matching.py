@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from samplify import matching
+from samplify import matching, rules
 
 
 # ── Distances ──────────────────────────────────────────────────────────────
@@ -522,3 +522,59 @@ def test_describe_difference_still_separates_a_swap_from_a_substitution():
     assert matching.describe_difference("batcha_1", "batchb_1") == "substitution"
     assert matching.describe_difference("smple_1", "sample_1") == "insertion or deletion"
     assert matching.describe_difference("alpha_1", "omega_1") == "unrelated"
+
+
+# ── The signs that identify a sample ───────────────────────────────────────
+
+
+def test_a_hyphen_between_two_characters_separates_two_tokens():
+    assert rules.prepare("S1-B1") == "s1_b1"
+    assert matching.group_names(["S1_B1", "s1-b1"], method="damerau") == [
+        ["S1_B1", "s1-b1"]
+    ]
+
+
+def test_a_hyphen_in_any_other_position_is_a_sign():
+    """dox- is the uninduced arm and dox+ is the induced one."""
+    assert rules.prepare("OVTOKO_DOX-_br1") == "ovtoko_dox-_br1"
+    assert matching.digit_signature("OVTOKO_DOX-_br1") == ("1", "-")
+    assert matching.digit_signature("OVTOKO_DOX+_br1") == ("1", "+")
+    assert matching.group_names(
+        ["OVTOKO_DOX+_br1", "OVTOKO_DOX-_br1"], method="damerau"
+    ) == [["OVTOKO_DOX+_br1"], ["OVTOKO_DOX-_br1"]]
+
+
+def test_a_sign_separates_two_populations():
+    """CD4+ and CD4- are two populations, and CXCR5+ and CXCR5- are two more."""
+    for pair in (
+        ["CD4+_donor1", "CD4-_donor1"],
+        ["PD-1lo CXCR5+ population 2", "PD-1lo CXCR5- population 2"],
+    ):
+        assert len(matching.group_names(pair, method="damerau")) == 2, pair
+
+
+def test_a_sign_survives_the_brackets_around_it():
+    """ICESeq(+), ICESeq(++) and ICESeq(-) are three conditions of PRJDA74549."""
+    names = [
+        "Human ICESeq(+), template 1",
+        "Human ICESeq(++), template 1",
+        "Human ICESeq(-), template 1",
+    ]
+    assert len(matching.group_names(names, method="damerau")) == 3
+
+
+def test_a_prime_marks_a_variant_of_a_name():
+    names = ["HAP1 WT#2-1'_RNA", "HAP1 WT#2-1_RNA"]
+    assert len(matching.group_names(names, method="damerau")) == 2
+
+
+def test_the_number_sign_is_not_a_sign():
+    """In #111_b2 it reads as the word number and identifies nothing."""
+    assert matching.rule_normalise("#111_b2") == "111_batch2"
+    assert matching.digit_signature("#111_b2") == ("111", "2")
+
+
+def test_the_abbreviations_still_expand_across_a_hyphen():
+    assert matching.group_names(
+        ["ctrl-r1-batch1", "CTRL_rep1_b1"], method="damerau"
+    ) == [["CTRL_rep1_b1", "ctrl-r1-batch1"]]

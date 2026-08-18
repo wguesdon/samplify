@@ -88,15 +88,16 @@ file with the analysis. A diff then shows the cleanup step.
 The `rules` backend applies the character rules in `src/samplify/rules.py`. It does
 five operations on each name.
 
-1. It changes every capital letter to a small letter, and it splits the name at
-   each delimiter.
-2. It joins a number to the word in front of it, so `s_8` and `s8` reach the
+1. It changes every capital letter to a small letter, and it replaces each
+   hyphen that separates two alphanumeric characters with an underscore.
+2. It splits the name at each delimiter.
+3. It joins a number to the word in front of it, so `s_8` and `s8` reach the
    abbreviation table as one token.
-3. It expands each abbreviation and removes the zero-padding from each number.
-4. It joins the tokens with an underscore.
-5. It removes each character that is not a letter, a digit or an underscore.
-   A letter in any script survives, because it can carry the identity of the
-   sample.
+4. It expands each abbreviation and removes the zero-padding from each number.
+5. It joins the tokens with an underscore.
+6. It removes each character that is not a letter, a digit, an underscore or a
+   sign. A letter in any script survives, because it can carry the identity of
+   the sample, and so does a sign.
 
 samplify puts two names in the same group when the two names normalise to the
 same string.
@@ -192,9 +193,37 @@ letter, so the signature of `p1b1` is `("1", "1")` and it agrees with the
 signature of `p1_b1`. The compact form and the delimited form of one name reach
 the same block for that reason.
 
+A sign joins the signature after the numbers. `rules.IDENTITY_SIGNS` holds the
+plus and the prime, and a hyphen counts as a sign wherever it does not separate
+two alphanumeric characters. The signature of `ovtoko_dox+_br1` is `("1", "+")`
+and the signature of `ovtoko_dox-_br1` is `("1", "-")`.
+
 The rule has two effects. It keeps `p111` and `p112` in separate groups at every
 threshold. It also reduces the number of comparisons, because samplify measures
 only the names that share a signature.
+
+## The signs
+
+A sign next to a token identifies the sample. `CD4+` and `CD4-` are two
+populations of one donor. `DOX+` and `DOX-` are the induced and the uninduced
+arm of one experiment. `WT2-1'` is a variant of `WT2-1`. Version 0.5.0 deleted
+every one of those characters, so the two names became one string and the rules
+path merged them with no distance computed at all.
+
+A hyphen is the difficult one, because it does both jobs. In `s1-b1` it
+separates two tokens, and in `dox-` it is the opposite of `dox+`. The rule reads
+the position. A hyphen between two alphanumeric characters separates, and a
+hyphen anywhere else is a sign. `rules.prepare` applies that rule one time, and
+both the tokens and the identity signature read its result, so the two can never
+disagree about a hyphen.
+
+The number sign is deliberately not a sign. In `#111_b2` it reads as the word
+number and it identifies nothing. The asterisk is absent for the same reason,
+because it marks a footnote more often than a sample.
+
+On the ENA corpus this rule removed 30 merges and added none. `ICESeq(+)`,
+`ICESeq(++)` and `ICESeq(-)` are three conditions of PRJDA74549 that samplify
+had joined into one sample.
 
 ## When a distance is enough on its own
 
@@ -418,7 +447,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 209 offline tests, no key and no server
+uv run pytest                 # 216 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

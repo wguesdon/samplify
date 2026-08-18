@@ -13,6 +13,37 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.6.0] - 2026-08-18
+
+### Fixed
+
+- A sign next to a token identifies the sample and is no longer deleted.
+  `CD4+` and `CD4-` are two populations, `DOX+` and `DOX-` are the induced and
+  the uninduced arm of one experiment, and `WT2-1'` is a variant of `WT2-1`.
+  Normalisation dropped every one of those characters, so the two names became
+  one string and the rules path merged them without any distance being
+  computed. The plus and the prime are in `rules.IDENTITY_SIGNS`, and both join
+  the identity signature, so samplify never compares the two names at all.
+- A hyphen is a delimiter only where it separates two alphanumeric characters,
+  as in `s1-b1`. A hyphen anywhere else is a sign, as in `dox-`.
+  `rules.prepare` applies that rule, and both the tokens and the identity
+  signature read it, so the two can never disagree.
+- The number sign stays out of the identity. In `#111_b2` it reads as the word
+  number and identifies nothing, and no name in the reference corpus used it as
+  a sign. The asterisk stays out for the same reason.
+- The model prompt names the signs and gives the reason, so a model reads the
+  same rule as the offline backends.
+
+On the ENA corpus this removed 30 merges and added none. Every one of the 30
+joined two different samples, among them `ICESeq(+)` with `ICESeq(++)` and with
+`ICESeq(-)`, and `CXCR5+` with `CXCR5-`. 74 merges remain.
+
+### Known and not fixed
+
+A substituted letter is still judged against the whole name and not against the
+token it sits in. That is 42 of the 74 merges that remain, and `TSmatKO-1`
+merged with `TSpatKO-1` is one of them.
+
 ## [0.5.0] - 2026-08-18
 
 The first version measured against real data. 20000 human RNA-seq runs were
@@ -49,12 +80,13 @@ version adds a rule and changes which names group together.
 ### Known and not fixed
 
 The cap is not sufficient. Of the 104 merges that survive it on the same
-corpus, 42 come from one substituted letter and 11 from a symbol that
+corpus, 42 come from one substituted letter and 30 from a symbol that
 normalisation drops. Both classes are wrong. `TSmatKO-1` merged with
 `TSpatKO-1`, which are a maternal and a paternal knockout, and `OVTOKO_DOX+`
 merged with `OVTOKO_DOX-`. A substitution has to be judged against the token it
 sits in and not against the whole name, and a `+` or a `-` next to a token
-carries meaning that normalisation deletes.
+carries meaning that normalisation deletes. Version 0.6.0 repairs the second
+class.
 
 ## [0.4.1] - 2026-08-18
 

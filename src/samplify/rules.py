@@ -15,8 +15,28 @@ from dataclasses import dataclass
 #: The only delimiter a canonical name may contain.
 CANONICAL_DELIMITER = "_"
 
-#: Characters treated as delimiters when a name is split into tokens.
-DELIMITER_PATTERN = r"[_\-.\s]"
+#: Characters treated as delimiters when a name is split into tokens. The
+#: hyphen is not here, because it is a delimiter only in one position. See
+#: :func:`prepare`.
+DELIMITER_PATTERN = r"[_.\s]"
+
+#: Characters that carry meaning where they stand and are never delimiters. A
+#: cohort writes ``CD4+`` and ``CD4-`` for two populations, and ``DOX+`` and
+#: ``DOX-`` for the induced and the uninduced arm of one experiment. A prime
+#: marks a variant of a name that is otherwise the same, as in ``WT2-1'``.
+#: Deleting any of them merges two different samples.
+#:
+#: The number sign is deliberately absent. In ``#111_b2`` it reads as the word
+#: number and identifies nothing, and no name in the reference corpus used it
+#: as a sign. The asterisk is absent for the same reason, because it marks a
+#: footnote more often than a sample.
+IDENTITY_SIGNS = "+'"
+
+#: A hyphen between two alphanumeric characters separates two tokens, as in
+#: ``s1-b1``. A hyphen in any other position is a sign that belongs to the
+#: token it touches, as in ``dox-``, which is the opposite of ``dox+``.
+_SEPARATING_HYPHEN = re.compile(r"(?<=[^\W_])-(?=[^\W_])")
+
 
 #: Characters a fully canonical name may hold. :func:`is_canonical` reports
 #: against this set.
@@ -25,8 +45,32 @@ CANONICAL_CHARSET = re.compile(r"[^a-z0-9_]")
 #: Characters that normalisation drops. A letter or a digit in any script
 #: survives, because it can carry the identity of the sample. A cohort that
 #: writes its replicates as ``sample_9α`` and ``sample_9β`` names two samples,
-#: and an ASCII-only set deletes both suffixes and merges the pair.
-NON_IDENTIFIER = re.compile(r"[^\w]")
+#: and an ASCII-only set deletes both suffixes and merges the pair. The signs
+#: in :data:`IDENTITY_SIGNS` and the hyphen survive for the same reason.
+NON_IDENTIFIER = re.compile(rf"[^\w{re.escape(IDENTITY_SIGNS)}-]")
+
+
+def prepare(name: str) -> str:
+    """Lower-case a name and turn each separating hyphen into the delimiter.
+
+    Every reader of a raw name calls this first, so that the tokens and the
+    identity signature always agree on which hyphens separate and which ones
+    carry meaning.
+
+    Args:
+        name: A raw sample name.
+
+    Returns:
+        The name in lower case, with each separating hyphen replaced by
+        :data:`CANONICAL_DELIMITER`.
+
+    Example:
+        >>> prepare("S1-B1")
+        's1_b1'
+        >>> prepare("OVTOKO_DOX-_br1")
+        'ovtoko_dox-_br1'
+    """
+    return _SEPARATING_HYPHEN.sub(CANONICAL_DELIMITER, name.lower())
 
 
 @dataclass(frozen=True)
@@ -106,7 +150,7 @@ def split_tokens(name: str) -> list[str]:
     Returns:
         The tokens of the name, lower-cased, with empty tokens removed.
     """
-    return [t for t in re.split(DELIMITER_PATTERN, name.lower()) if t]
+    return [t for t in re.split(DELIMITER_PATTERN, prepare(name)) if t]
 
 
 def detect_abbreviations(names: list[str]) -> list[str]:
@@ -151,7 +195,10 @@ def prompt_rules() -> str:
             f"- Expand these abbreviations: {expansions}",
             "- Remove zero-padding: sample01 -> sample1, batch002 -> batch2",
             "- Lower-case everything",
-            "- Drop any character that is not a letter, a digit or an underscore",
+            "- Drop any character that is not a letter, a digit, an underscore"
+            f" or one of these signs: {IDENTITY_SIGNS} and the hyphen",
+            "- Keep a sign such as + or - where it stands. CD4+ and CD4- are two"
+            " different populations, and DOX+ and DOX- are two different arms.",
             "- Keep the component order consistent across all names",
             "- Leave a token unchanged when you cannot tell what it abbreviates."
             " An unexpanded token is safer than a wrong expansion, because a"
