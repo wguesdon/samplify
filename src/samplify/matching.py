@@ -75,6 +75,16 @@ MIN_SLIP_LENGTH = 5
 #: The cap costs a name with two typing errors, which stays in its own group. A
 #: person then reads two samples where there is one, and that is the failure
 #: this tool prefers. A wrong merge drops a row and reports nothing.
+#:
+#: The cap governs one pair, and a group is built from many pairs, so a chain of
+#: one-edit steps can hold two ends that are two edits apart. That is deliberate
+#: and it is not the case that :func:`split_on_a_substitution` repairs. A chain
+#: carries evidence: some third name in the group is one edit from both ends,
+#: and it is the reason to believe the two are one sample. A substitution
+#: carries the opposite, because that edit usually marks a different sample and
+#: no intermediate name changes what the letters mean. The reference corpus of
+#: 390 study and field combinations holds no group at all in which a pair joined
+#: by a distance sits above the cap.
 MAX_TYPO_EDITS = 1
 
 #: The most letters that may stand at one position before

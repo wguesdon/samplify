@@ -320,3 +320,17 @@ def test_members_must_be_a_list():
 def test_the_groups_key_must_be_a_list():
     with pytest.raises(ValueError, match="must be a list"):
         MappingFile.from_dict({"schema_version": 1, "groups": {"id": 1}})
+
+
+@pytest.mark.parametrize("document", [[], [{"id": 1}], "text", 7, None])
+def test_a_mapping_file_that_is_not_an_object_is_refused(document):
+    """json.load returns whatever the file holds, and a list has no .get."""
+    with pytest.raises(ValueError, match="holds an object"):
+        MappingFile.from_dict(document)
+
+
+def test_a_mapping_file_that_is_not_an_object_is_refused_on_disk(tmp_path):
+    path = tmp_path / "mapping.json"
+    path.write_text('[{"id": 1}]')
+    with pytest.raises(ValueError, match="holds an object"):
+        mapping_module.read(path)

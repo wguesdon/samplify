@@ -13,6 +13,31 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.2] - 2026-08-18
+
+### Fixed
+
+- `apply` reports every collision it applies. It refuses one in a mapping that
+  no person reviewed and it allows one in a reviewed mapping, because a person
+  signed for it. It said nothing in the second case, so a file claiming
+  `"reviewed": true` could join two patients into one sample with no line of
+  output. Joining two groups into one name is the most consequential thing this
+  tool does and it is no longer done in silence. The log records the collisions
+  in a new `collisions` field.
+- A mapping file whose top level is not an object is refused with a message.
+  `json.load` returns whatever the file holds, and a list has no `.get`, so a
+  file holding a list reached the user as an `AttributeError` traceback.
+
+### Not changed
+
+The edit cap governs one pair, and a group is built from many pairs, so a chain
+of one-edit steps can hold two ends that are two edits apart. That is not the
+case that `split_on_a_substitution` repairs. A chain carries evidence, because
+some third name is one edit from both ends, and that is the reason to believe
+the three are one sample. A substitution carries the opposite. The reference
+corpus holds no group at all in which a pair joined by a distance sits above the
+cap. A test now pins the behaviour so that it stays a decision.
+
 ## [0.9.1] - 2026-08-18
 
 A third review found five defects. Two of them merged two different samples.

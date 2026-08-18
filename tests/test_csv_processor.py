@@ -675,3 +675,41 @@ def test_a_canonical_name_the_model_returns_must_be_a_name(answer):
 
     with pytest.raises(ValueError):
         _parse_answer(answer, ["control"])
+
+
+def test_the_log_records_a_collision_that_apply_allowed(tmp_path):
+    """A reviewed mapping may join two groups, and it may not do so in silence.
+
+    Joining two groups into one name is the most consequential thing this tool
+    does. apply refuses it in a mapping no person reviewed, and it allows it in
+    a reviewed one, so the reviewed case has to reach the log and the console.
+    """
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\npatient11_batch1\npatient111_batch1\n")
+
+    mapping = MappingFile(
+        groups=[
+            mapping_module.Group(
+                id=1, members=["patient11_batch1"], proposed="patient11_batch1",
+                final="patient11_batch1", status="accepted",
+                occurrences={"patient11_batch1": 1},
+            ),
+            mapping_module.Group(
+                id=2, members=["patient111_batch1"], proposed="patient111_batch1",
+                final="patient11_batch1", status="accepted",
+                occurrences={"patient111_batch1": 1},
+            ),
+        ],
+        input_file=str(source), column="sample_id", reviewed=True,
+    )
+
+    _, log = apply_mapping(mapping)
+    assert log["collisions"] == {"patient11_batch1": [1, 2]}
+
+
+def test_the_log_holds_no_collision_when_there_is_none(tmp_path):
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    mapping = _accepted(source)
+    _, log = apply_mapping(mapping)
+    assert log["collisions"] == {}

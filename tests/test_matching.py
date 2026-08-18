@@ -725,3 +725,25 @@ def test_clear_name_caches_forgets_a_normalisation():
         matching.clear_name_caches()
 
     assert matching.rule_normalise("s1") == "sample1"
+
+
+def test_a_chain_of_one_edit_steps_may_span_two_edits():
+    """This is a decision and not an accident.
+
+    The cap governs one pair, and a group is built from many pairs. A chain
+    carries evidence, because the middle name is one edit from both ends and
+    that is the reason to believe the three are one sample. A substitution
+    carries the opposite, and split_on_a_substitution removes those.
+
+    The reference corpus holds no group in which a pair joined by a distance
+    sits above the cap, so nothing real depends on this either way.
+    """
+    chain = ["abcdefgh1", "abcdefg1", "abcdef1"]
+    assert matching.group_names(chain, method="damerau") == [sorted(chain)]
+
+    # The two ends alone are two edits apart, and alone they do not merge.
+    ends = [chain[0], chain[-1]]
+    assert matching.damerau_levenshtein_distance(
+        matching.letter_skeleton(ends[0]), matching.letter_skeleton(ends[1])
+    ) == 2
+    assert matching.group_names(ends, method="damerau") == [[ends[1]], [ends[0]]]

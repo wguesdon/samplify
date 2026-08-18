@@ -447,6 +447,16 @@ def _run_apply(args: argparse.Namespace) -> int:
     )
     if not log["reviewed"]:
         console.print("[yellow]This mapping was not reviewed by a person.[/yellow]")
+
+    # apply refuses a collision in a mapping that no person reviewed, and it
+    # allows one in a reviewed mapping because a person signed for it. Joining
+    # two groups into one name is the most consequential thing this tool does,
+    # so it is never done in silence.
+    for name, ids in log["collisions"].items():
+        console.print(
+            f"[red]Groups {ids} all became {escape(name)}.[/red] "
+            f"Those samples are now one sample in the output."
+        )
     for label, path in (
         ("Output CSV", args.output),
         ("JSON log", args.json_log),

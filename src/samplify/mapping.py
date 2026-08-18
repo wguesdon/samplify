@@ -330,6 +330,13 @@ class MappingFile:
             ValueError: If the schema version is unsupported, a required key is
                 missing, or a name appears in more than one group.
         """
+        # json.load returns whatever the file holds, and a list has no .get.
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"A mapping file holds an object. This one holds a "
+                f"{type(data).__name__}."
+            )
+
         version = data.get("schema_version")
         if version != SCHEMA_VERSION:
             raise ValueError(

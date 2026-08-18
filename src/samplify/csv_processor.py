@@ -522,6 +522,10 @@ def apply_mapping(
     # Raises while any group is still proposed.
     final_mapping = mapping.final_mapping()
 
+    # Two groups landing on one name is the most consequential thing this tool
+    # does, so the log records it whether or not apply refuses. A reviewed file
+    # is allowed to hold one, because a person signed for it, and it still has
+    # to be said out loud.
     collisions = mapping.collisions()
     if collisions and not mapping.reviewed:
         detail = "; ".join(
@@ -595,6 +599,7 @@ def apply_mapping(
     )
 
     log: dict[str, Any] = {
+        "collisions": {name: ids for name, ids in collisions.items()},
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "input_file": str(path.resolve()),
         "mapping_file": mapping_path,
