@@ -391,17 +391,31 @@ def digit_signature(name: str) -> tuple[str, ...]:
     # The signs come after the numbers, so that adding one never moves the
     # position of a number. The near-miss search reads a number by its position.
     #
-    # This drops where each sign stood, so `cd4+_donor1` and `cd+4_donor1` share
-    # one signature and can merge. That is measured and accepted: of the 17683
-    # names in the reference corpus that hold a sign, exactly one pair differs
-    # only in the order of its characters, and that pair moved a number rather
-    # than a sign and is one sample written two ways.
+    # A sign between two numbers is told from a sign after them, because each
+    # one records how many numbers stand before it. `cd4+_donor1` and
+    # `cd+4_donor1` still share a signature, since both hold one sign after no
+    # number, and of the 17683 names in the reference corpus that hold a sign,
+    # exactly one pair differs only in the order of its characters, and that
+    # pair moved a number rather than a sign.
     # A sign joins the signature, and so does any other character that the rules
-    # can neither read nor safely drop. See :func:`_identifies_but_cannot_be_read`.
-    signature.extend(
-        character for character in lowered
-        if character in _SIGN_CHARACTERS or _identifies_but_cannot_be_read(character)
-    )
+    # can neither read nor safely drop. See
+    # :func:`_identifies_but_cannot_be_read`.
+    #
+    # Each one carries the count of numbers that stand before it, so that
+    # `control+_batch1` and `control_batch1+` differ. The numbers keep the
+    # first places of the signature and their positions never move, because the
+    # near-miss search reads a number by its position.
+    runs = 0
+    inside_a_number = False
+    for character in lowered:
+        if character.isdecimal():
+            if not inside_a_number:
+                runs += 1
+                inside_a_number = True
+            continue
+        inside_a_number = False
+        if character in _SIGN_CHARACTERS or _identifies_but_cannot_be_read(character):
+            signature.append(f"{runs}{character}")
 
     return tuple(signature)
 

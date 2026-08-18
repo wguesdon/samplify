@@ -647,11 +647,25 @@ def apply_mapping(
     for candidate in (mapping_path, mapping.source_path):
         if candidate is not None:
             inputs.append(("the mapping file", Path(candidate)))
-    for label, destination in (
+    destinations = [
         ("--output", output_path),
         ("--json-log", json_log_path),
         ("--csv-log", csv_log_path),
-    ):
+    ]
+    # No two outputs may name one file either. The second write replaces the
+    # first, so --output clean.csv --json-log clean.csv left the log where the
+    # cleaned data should have been.
+    for index, (label, destination) in enumerate(destinations):
+        if destination is None:
+            continue
+        for other_label, other in destinations[index + 1:]:
+            if other is not None and is_the_same_file(destination, other):
+                raise ValueError(
+                    f"{label} and {other_label} both point at {destination}. "
+                    f"The second file written would replace the first."
+                )
+
+    for label, destination in destinations:
         if destination is None:
             continue
         for description, source in inputs:

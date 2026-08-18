@@ -221,6 +221,15 @@ def _run_propose(args: argparse.Namespace) -> int:
     # The mapping file and the figure go somewhere else. `-o data.csv` wrote the
     # mapping JSON over the CSV it had just read, and the names were gone.
     source = Path(args.file)
+    # Neither output may name the file the other one writes. The figure
+    # replaced the mapping when both were given one path.
+    if args.plot is not None and is_the_same_file(output, args.plot):
+        _print_error(
+            f"--output and --plot both point at {output}. The second file "
+            f"written would replace the first."
+        )
+        return 1
+
     for label, destination in (("--output", output), ("--plot", args.plot)):
         if destination is None:
             continue

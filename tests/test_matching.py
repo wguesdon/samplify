@@ -537,8 +537,10 @@ def test_a_hyphen_between_two_characters_separates_two_tokens():
 def test_a_hyphen_in_any_other_position_is_a_sign():
     """dox- is the uninduced arm and dox+ is the induced one."""
     assert rules.prepare("OVTOKO_DOX-_br1") == "ovtoko_dox-_br1"
-    assert matching.digit_signature("OVTOKO_DOX-_br1") == ("1", "-")
-    assert matching.digit_signature("OVTOKO_DOX+_br1") == ("1", "+")
+    # A sign carries the count of numbers that stand before it, so that
+    # `control+_batch1` and `control_batch1+` differ.
+    assert matching.digit_signature("OVTOKO_DOX-_br1") == ("1", "0-")
+    assert matching.digit_signature("OVTOKO_DOX+_br1") == ("1", "0+")
     assert matching.group_names(
         ["OVTOKO_DOX+_br1", "OVTOKO_DOX-_br1"], method="damerau"
     ) == [["OVTOKO_DOX+_br1"], ["OVTOKO_DOX-_br1"]]
@@ -760,7 +762,7 @@ def test_a_superscript_does_not_crash_the_near_miss_search():
     """
     assert "²".isdigit() and not "²".isdecimal()
     assert matching.find_near_misses(["sample²_1", "sample_1"]) == []
-    assert matching.digit_signature("sample²_1") == ("1", "²")
+    assert matching.digit_signature("sample²_1") == ("1", "0²")
 
 
 def test_a_character_that_is_neither_a_letter_nor_a_digit_identifies_a_sample():
@@ -780,7 +782,7 @@ def test_a_combining_mark_identifies_a_sample():
     `sampleİ1` the same name as `sampleI1`. Two names that differ by a Greek
     letter already stay apart, so these have to as well."""
     assert "İ".lower() == "i̇"
-    assert matching.digit_signature("sampleİ1") == ("1", "̇")
+    assert matching.digit_signature("sampleİ1") == ("1", "0̇")
     assert matching.group_names(["sampleI1", "sampleİ1"], method="damerau") == [
         ["sampleI1"],
         ["sampleİ1"],
@@ -957,3 +959,14 @@ def test_every_dash_separates_two_tokens_where_a_hyphen_would(dash):
     groups = matching.group_names([f"S1{dash}B1", "S1_B1"], method="damerau")
     assert len(groups) == 1
     assert set(groups[0]) == {f"S1{dash}B1", "S1_B1"}
+
+
+def test_a_sign_carries_its_position():
+    """`control+_batch1` and `control_batch1+` are two names, and the signature
+    said they were one. Each sign records how many numbers stand before it, and
+    the numbers keep the first places so their positions never move."""
+    assert matching.digit_signature("control+_batch1") == ("1", "0+")
+    assert matching.digit_signature("control_batch1+") == ("1", "1+")
+    assert len(matching.group_names(
+        ["control+_batch1", "control_batch1+"], method="damerau"
+    )) == 2

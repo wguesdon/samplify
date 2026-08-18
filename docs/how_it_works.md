@@ -229,7 +229,10 @@ letter, so the signature of `p1b1` is `("1", "1")` and it agrees with the
 signature of `p1_b1`. The compact form and the delimited form of one name reach
 the same block for that reason.
 
-A sign joins the signature after the numbers. `rules.IDENTITY_SIGNS` holds the
+A sign joins the signature after the numbers, and it records how many numbers
+stand before it, so that `control+_batch1` and `control_batch1+` are two names.
+The numbers keep the first places of the signature and their positions never
+move, because the near-miss search reads a number by its position. `rules.IDENTITY_SIGNS` holds the
 plus and the prime, and a hyphen counts as a sign wherever it does not separate
 two alphanumeric characters. The signature of `ovtoko_dox+_br1` is `("1", "+")`
 and the signature of `ovtoko_dox-_br1` is `("1", "-")`.
@@ -544,7 +547,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 498 offline tests, no key and no server
+uv run pytest                 # 499 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
