@@ -184,6 +184,12 @@ class Group:
             if key not in data:
                 raise ValueError(f"Group is missing the required key {key!r}.")
         # int(None) raises a TypeError, and this class documents ValueError.
+        # A bool is refused first, because bool is a subclass of int in Python
+        # and int(True) is 1, so a group with the id true became group 1.
+        if isinstance(data["id"], bool) or data["id"] is None:
+            raise ValueError(
+                f"A group has the id {data['id']!r}. An id must be a number."
+            )
         try:
             identifier = int(data["id"])
         except (TypeError, ValueError):

@@ -336,7 +336,7 @@ def test_a_mapping_file_that_is_not_an_object_is_refused_on_disk(tmp_path):
         mapping_module.read(path)
 
 
-@pytest.mark.parametrize("identifier", [None, "one", [], {}])
+@pytest.mark.parametrize("identifier", [None, "one", [], {}, True, False])
 def test_a_group_id_that_is_not_a_number_is_refused(identifier):
     """int(None) raises TypeError, and this class documents ValueError."""
     document = {

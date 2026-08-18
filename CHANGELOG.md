@@ -13,6 +13,16 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.4] - 2026-08-18
+
+The eleventh review found one defect and reported that it is not major.
+
+### Fixed
+
+- A group id given as `true` is refused. `bool` is a subclass of `int` in
+  Python and `int(True)` is 1, so a group whose id was `true` became group 1
+  and every check downstream passed.
+
 ## [0.10.3] - 2026-08-18
 
 Found by reading the code rather than by a review. Two commands were guarded
