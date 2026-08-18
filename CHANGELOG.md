@@ -13,6 +13,22 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.2] - 2026-08-18
+
+A tenth review found two defects.
+
+### Fixed
+
+- `propose` writes no output over its own input. `-o data.csv` wrote the mapping
+  JSON over the CSV it had just read, and the names were gone. `--plot` is
+  refused the same way. 0.10.0 guarded the three outputs of `apply` and left
+  these two.
+- Zero padding falls away in any script. `str.lstrip("0")` removes the ASCII
+  zero and nothing else, so the Arabic-Indic `٠١` kept its padding while `01`
+  lost it, and the two spellings of one number had different identities and
+  never grouped. The digits keep their own script, so `sample١` and `sample1`
+  stay apart for the same reason that `sample_9α` and `sample_9a` do.
+
 ## [0.10.1] - 2026-08-18
 
 ### Fixed

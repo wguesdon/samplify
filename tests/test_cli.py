@@ -193,3 +193,21 @@ def test_the_review_command_writes_what_the_person_answered(
     else:
         with pytest.raises(ValueError, match="still proposed"):
             result.final_mapping()
+
+
+@pytest.mark.parametrize("option", ["--output", "--plot"])
+def test_propose_writes_no_output_over_its_own_input(tmp_path, option, capsys):
+    """`-o data.csv` wrote the mapping JSON over the CSV it had just read."""
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    before = source.read_text()
+
+    code = cli.main(
+        ["propose", str(source), "-c", "sample_id", "-M", "damerau", "--yes",
+         option, str(source)]
+        + ([] if option == "--output" else ["-o", str(tmp_path / "m.json")])
+    )
+
+    assert code == 1
+    assert "which is the input" in " ".join(capsys.readouterr().out.split())
+    assert source.read_text() == before

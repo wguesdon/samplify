@@ -301,7 +301,8 @@ The cap also decides the cost of the search. A distance that may not exceed one
 edit needs three diagonals of the grid and not the whole grid, so one
 comparison costs the length of the name rather than its square. `propose` on
 2267 sample titles of median length 97 took 376.9 seconds without the cap and
-39.0 seconds with it.
+39.0 seconds with it. The compiled patterns and the caches of 0.8.2 brought the
+same run to 1.3 seconds.
 
 Two names with no letter at all never match. The ratio compares two empty
 strings and scores 1.0, which reads as agreement and is the absence of any
@@ -425,7 +426,9 @@ count, because a count goes stale and a list does not.
    file, and applying it would change nothing and report every name as changed.
 8. Two groups claim one name. One group would decide the name of that sample
    and the other would be ignored, so `final_mapping` refuses instead.
-9. An output path is the input path. samplify promises that the input survives
+9. An output path is the input path. `propose` refuses the same for its
+   mapping file and its figure, because `-o data.csv` wrote the mapping over
+   the CSV it had just read. samplify promises that the input survives
    the run, and one character of a shell command separates `--output clean.csv`
    from `--output data.csv`. A log written over the input would lose the file.
 10. A group holds a field that cannot decide a name. `Group.validate` holds
@@ -516,7 +519,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 315 offline tests, no key and no server
+uv run pytest                 # 318 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

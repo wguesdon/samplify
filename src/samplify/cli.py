@@ -218,6 +218,19 @@ def _run_propose(args: argparse.Namespace) -> int:
     output = Path(args.output) if args.output else Path(f"{Path(args.file).stem}_mapping.json")
     _warn_when_the_names_leave_this_machine(args)
 
+    # The mapping file and the figure go somewhere else. `-o data.csv` wrote the
+    # mapping JSON over the CSV it had just read, and the names were gone.
+    source = Path(args.file)
+    for label, destination in (("--output", output), ("--plot", args.plot)):
+        if destination is None:
+            continue
+        if Path(destination).resolve() == source.resolve():
+            _print_error(
+                f"{label} points at {source}, which is the input. samplify "
+                f"writes no output over its own input."
+            )
+            return 1
+
     try:
         result = propose_csv(
             args.file,

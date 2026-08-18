@@ -368,7 +368,7 @@ def digit_signature(name: str) -> tuple[str, ...]:
             suffix = ""
             index = letters_start
 
-        signature.append((digits.lstrip("0") or "0") + suffix)
+        signature.append(_without_padding(digits) + suffix)
 
     # The signs come after the numbers, so that adding one never moves the
     # position of a number. The near-miss search reads a number by its position.
@@ -386,6 +386,29 @@ def digit_signature(name: str) -> tuple[str, ...]:
     )
 
     return tuple(signature)
+
+
+def _without_padding(digits: str) -> str:
+    """Remove the leading zeros of a run of digits, in any script.
+
+    ``str.lstrip("0")`` removes the ASCII zero and nothing else, so the
+    Arabic-Indic ``٠١`` kept its padding while ``01`` lost it. The two spellings
+    of a number then had different identities and never grouped.
+
+    The digits keep their own script. ``sample١`` and ``sample1`` hold the same
+    number in two scripts, and they stay apart for the same reason that
+    ``sample_9α`` and ``sample_9a`` stay apart.
+
+    Args:
+        digits: A run of decimal digits.
+
+    Returns:
+        The run without its leading zeros, and ``"0"`` when every digit is one.
+    """
+    trimmed = digits
+    while len(trimmed) > 1 and unicodedata.decimal(trimmed[0], None) == 0:
+        trimmed = trimmed[1:]
+    return trimmed
 
 
 def _identifies_but_cannot_be_read(character: str) -> bool:

@@ -794,3 +794,18 @@ def test_the_three_name_readers_are_the_cached_ones():
                    matching.rule_normalise):
         assert hasattr(reader, "cache_clear"), reader.__name__
     assert not hasattr(matching._identifies_but_cannot_be_read, "cache_clear")
+
+
+def test_zero_padding_falls_away_in_any_script():
+    """`str.lstrip("0")` removes the ASCII zero and nothing else.
+
+    The Arabic-Indic `٠١` kept its padding while `01` lost it, so the two
+    spellings of one number had different identities and never grouped. The
+    digits keep their own script, so `sample١` and `sample1` stay apart for the
+    same reason that `sample_9α` and `sample_9a` do.
+    """
+    assert matching.digit_signature("sample٠١") == matching.digit_signature("sample١")
+    assert matching.digit_signature("sample01") == matching.digit_signature("sample1")
+    assert matching.digit_signature("sample000") == ("0",)
+    assert len(matching.group_names(["sample٠١", "sample١"], method="damerau")) == 1
+    assert len(matching.group_names(["sample1", "sample١"], method="damerau")) == 2
