@@ -13,6 +13,75 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.14.0] - 2026-08-19
+
+A third review with no list of past findings. Both of its findings are real and
+one of them merged two different samples.
+
+### Fixed
+
+- A whole token added or removed is not a typing error, and samplify refuses a
+  pair where one name holds every token of the other and one more. The corpus
+  held five such merges. `MSTO-211H PBS 6h` and `MSTO-211H_R PBS 6h` are a
+  parental cell line and the resistant line derived from it in a study of
+  pemetrexed resistance, and the words around the added token made it look like
+  one inserted letter. A name written without delimiters is not that shape, so
+  `p1b1` and `p1_b1` still merge.
+- A difference is judged against the token that holds it, when the two names
+  hold the same number of tokens and exactly one differs. Shared context must
+  not license a difference. `sample_A` and `sample_AA` differ by one letter in
+  a name of seven, and they are two identifiers. The corpus held one merge of
+  that shape: samplify kept `SMB` and `USMB` apart and merged
+  `SM B from healthy control` with `USM B from healthy control`, which are the
+  same two samples written out.
+- The warning that says the sample names are leaving this machine reads the
+  host from the URL and compares it whole. It looked for the text `localhost`
+  anywhere in the URL, so `localhost.example.com` and `127.0.0.1.evil.example`
+  passed as this machine, and that line is the one that tells a person their
+  sample names are going elsewhere.
+
+The corpus gives 26 merges now rather than 32, and each of the 26 was read: 24
+are a difference of formatting, one is a real transposition and one moves a
+replicate number. The six that this version removed had been reported as
+correct after 0.7.0, and they were not. `README.md` and the figure say so.
+
+## [0.13.0] - 2026-08-19
+
+A second review with no list of past findings. It named four defects, three of
+which are real and two of which destroy a file.
+
+### Fixed
+
+- A sign records how many numbers stand before it, so `control+_batch1` and
+  `control_batch1+` are two names. The signature held the signs in a list at
+  the end and lost where each one stood, so the two merged. The numbers keep
+  the first places of the signature and their positions never move, because the
+  near-miss search reads a number by its position.
+- No two outputs of one command may name one file. `apply --output clean.csv
+  --json-log clean.csv` wrote the CSV and then replaced it with the log, and
+  `propose -o qc.png --plot qc.png` replaced the mapping with the figure. Each
+  command now refuses that before it writes anything.
+
+### Not a defect
+
+The review reported that a whitespace-only cell is dropped. It is not a name,
+so it forms no group, and the row survives with every column unchanged and the
+cell carrying its own value into the canonical column. Three rows in gave three
+rows out when this was run.
+
+## [0.12.3] - 2026-08-19
+
+### Fixed
+
+- `propose` writes all of its files or none of them, in the same way that
+  `apply` does. The mapping file was written and then a figure with a bad path
+  failed, so the command reported an error while one of its files was on disk.
+
+### Added
+
+- Tests that drive every command with every pair of its output options pointing
+  at one path, and a test that a failed command leaves no file behind.
+
 ## [0.12.2] - 2026-08-19
 
 ### Added
@@ -24,8 +93,6 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 ### Fixed
 
-- `propose` writes all of its files or none of them, in the same way. The
-  mapping file was written and then a figure with a bad path failed.
 - `apply` writes all of its files or none of them. Each destination is checked
   before the first one is written. The output CSV was written and then a log
   with a bad path failed, so the command reported an error and exited with the
