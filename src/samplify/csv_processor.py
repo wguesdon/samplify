@@ -84,6 +84,15 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
 
     df = pd.read_csv(path, dtype=str, keep_default_na=False, na_filter=False)
     if column not in df.columns:
+        # A tab separated file reads as one column whose name holds every
+        # heading. The list of available columns then shows one entry that
+        # looks like the whole header line, and it does not say why.
+        if len(df.columns) == 1 and "\t" in str(df.columns[0]):
+            raise ValueError(
+                f"{path} holds one column, and its name holds a tab. This "
+                f"reads as a file separated by tabs, and samplify reads a file "
+                f"separated by commas. Save it as a CSV and run it again."
+            )
         raise ValueError(
             f"Column {column!r} not found in {path}. Available: {list(df.columns)}"
         )

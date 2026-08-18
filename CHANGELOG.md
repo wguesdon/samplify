@@ -13,6 +13,16 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.12.1] - 2026-08-19
+
+### Fixed
+
+- A file separated by tabs says why it cannot be read. It reads as one column
+  whose name holds every heading, so the message listed one available column
+  that looked like the whole header line and said nothing about the cause. A
+  file separated by tabs is the common alternative in this field, and the ENA
+  archive serves one.
+
 ## [0.12.0] - 2026-08-19
 
 A review with no list of past findings, written to check that the exclusions

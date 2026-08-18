@@ -933,3 +933,21 @@ def test_a_mapping_read_from_a_file_remembers_where_it_came_from(tmp_path):
     # The ordinary path is untouched.
     apply_mapping(restored, output_path=tmp_path / "clean.csv")
     assert (tmp_path / "clean.csv").exists()
+
+
+def test_a_tab_separated_file_says_why_it_cannot_be_read(tmp_path):
+    """It reads as one column whose name holds every heading, and the list of
+    available columns then shows one entry that looks like the header line."""
+    source = tmp_path / "data.tsv"
+    source.write_text("sample_id\tvalue\nS1_B1\t1\ns1-b1\t2\n")
+
+    with pytest.raises(ValueError, match="separated by tabs"):
+        propose_csv(source, "sample_id", method="damerau")
+
+
+def test_an_ordinary_missing_column_still_lists_the_columns(tmp_path):
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id,value\nS1_B1,1\n")
+
+    with pytest.raises(ValueError, match="Available: \\['sample_id', 'value'\\]"):
+        propose_csv(source, "absent", method="damerau")
