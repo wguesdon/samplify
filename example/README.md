@@ -114,4 +114,4 @@ faults, and it must keep three pairs apart.
 | `sample_10` and `sample_100` | Two samples, and the only pair reported for a person to check. |
 
 The quality control figure for this file is in
-`docs/img/qc_mislabel_catalogue.png`.
+`docs/img/qc_mislabel_catalogue.png`, and the README shows it.

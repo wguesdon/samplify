@@ -150,6 +150,49 @@ samplify draws the figure from the mapping file. The command
 `samplify plot mapping.json -o qc.png` draws it again at any time, and it also
 works after the review.
 
+The file `example/mislabel_catalogue.csv` is the reference set. Each of its rows
+names its own fault and records the correct sample in a `true_sample` column, so
+a test checks the answer and no person reads the output. Twenty-four written
+names cover fourteen real samples.
+
+```bash
+uv run samplify propose example/mislabel_catalogue.csv -c sample_id -M damerau \
+  -o mapping.json --plot qc.png
+```
+
+![Quality control figure for example/mislabel_catalogue.csv](docs/img/qc_mislabel_catalogue.png)
+
+The blocks on the diagonal are the fourteen samples. The pair `sample_10` and
+`sample_100` is the one that samplify refuses to merge, and the last panel gives
+the reason for that pair and for each name that samplify did merge.
+
+## Validation on real data
+
+samplify was measured against the free-text sample names of 20,000 human
+RNA-seq runs of the [ENA archive](https://www.ebi.ac.uk/ena/browser/home). The
+names in `library_name` and `sample_title` are typed by the submitting lab,
+which is the input this tool is written for. 390 study and field combinations
+hold between 8 and 200 unique names.
+
+![Merges proposed on real data, by version](docs/img/validation_ena.png)
+
+The run found three faults, and each one merged two different samples with no
+message. A ratio scales with the length of a name, so a long shared context hid
+a short difference: `EVT-TS-1_paired-RNA` and `ST-TS-1_paired-RNA` are two cell
+types. Normalisation deleted a sign that identifies a sample, so `OVTOKO_DOX+`
+and `OVTOKO_DOX-` became one string. A substituted letter merged
+`Primary B cells` with `Primary T cells`.
+
+Version 0.7.0 proposes 32 merges on that corpus. Each of the 32 was read by
+hand and each is correct. Of the merges that later versions removed, all 30 of
+the sign class and all 42 of the substitution class were read, and a sample of
+the 246 that the edit cap removed. Every one of them joined two different
+samples.
+
+The script `docs/make_validation_figure.py` redraws the figure, and
+[docs/how_it_works.md](docs/how_it_works.md) gives the rule that each version
+added.
+
 ## Documentation
 
 - [docs/how_it_works.md](docs/how_it_works.md) explains the backends, the mapping

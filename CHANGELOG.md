@@ -47,6 +47,13 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 - The figure reads the reason of each reported pair instead of naming every one
   of them a digit slip.
+- The README shows three figures and not one. The worked example and the
+  reference set are the output of `samplify plot`, and the third records the
+  validation on real data. `docs/make_validation_figure.py` redraws the third.
+  Its two colours are the ones `samplify.plots` already uses, so the three read
+  as one system, and the pair clears the colour-vision checks.
+- The README gains a section on the validation, which states how many of the
+  removed merges were read by hand and how many were sampled.
 
 samplify now proposes 32 merges on the ENA corpus, and every one of them was
 read by hand and is correct. The count was 350 in version 0.4.1.
