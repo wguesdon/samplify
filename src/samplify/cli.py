@@ -17,6 +17,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from rich.console import Console
 from rich.markup import escape
@@ -46,6 +47,10 @@ from .mapping import (
 )
 
 console = Console()
+
+#: The names of this machine. A model that runs here keeps the sample names
+#: here, and any other host does not.
+_THIS_MACHINE = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", ""})
 
 _PROVIDER_HELP = (
     f"Which service answers, for the llm and auto backends (default: {DEFAULT_PROVIDER}). "
@@ -204,9 +209,12 @@ def _warn_when_the_names_leave_this_machine(args: argparse.Namespace) -> None:
         return
 
     url = resolve_base_url(args.provider, args.base_url)
-    if args.provider == "ollama" and not any(
-        host in url for host in ("localhost", "127.0.0.1", "[::1]")
-    ):
+    # The host is read from the URL and compared whole. Looking for the text
+    # "localhost" anywhere in the URL let `localhost.example.com` and
+    # `127.0.0.1.evil.example` pass as this machine, and this is the line that
+    # tells a person their sample names are leaving it.
+    host = urlparse(url).hostname or ""
+    if args.provider == "ollama" and host.lower() not in _THIS_MACHINE:
         console.print(
             f"[yellow]The sample names go to ollama at {escape(url)}, which is "
             f"not this machine.[/yellow] The mapping file records that address."

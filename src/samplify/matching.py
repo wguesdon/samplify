@@ -739,6 +739,20 @@ def describe_difference(a: str, b: str) -> str:
     # number sign stops the token from reaching the zero-padding rule.
     if left == right:
         return "formatting only"
+    return classify_letters(left, right)
+
+
+def classify_letters(left: str, right: str) -> str:
+    """Name the difference between two runs of letters.
+
+    Args:
+        left: The letters of one name, or of one token of it.
+        right: The letters of the other.
+
+    Returns:
+        ``"insertion or deletion"``, ``"transposition"``, ``"substitution"`` or
+        ``"unrelated"``.
+    """
     if damerau_levenshtein_distance(left, right, max_distance=1) != 1:
         return "unrelated"
     if len(left) != len(right):
@@ -757,6 +771,56 @@ def describe_difference(a: str, b: str) -> str:
     ):
         return "transposition"
     return "substitution"
+
+
+def _letter_tokens(name: str) -> list[str]:
+    """Return the letters of each token of a name, in order.
+
+    Args:
+        name: A raw sample name.
+
+    Returns:
+        One entry for each token that holds a letter, holding that token's
+        letters.
+    """
+    return [
+        "".join(character for character in token if character.isalpha())
+        for token in rules.split_tokens(name)
+        if any(character.isalpha() for character in token)
+    ]
+
+
+def comparable_letters(a: str, b: str) -> tuple[str, str]:
+    """Return the letters that decide whether two names are one sample.
+
+    When the two names hold the same number of tokens and differ in exactly
+    one, that token decides. The rest is context that the two share, and shared
+    context must not license a difference. `sample_A` and `sample_AA` differ by
+    one letter in a name of seven, and they are two identifiers. The same shape
+    merged `SM B from healthy control` with `USM B from healthy control` in the
+    reference corpus, while the same two samples written `SMB` and `USMB` were
+    correctly kept apart.
+
+    When the token counts differ, or more than one token differs, the whole
+    letter skeleton decides, because no single token holds the difference.
+
+    Args:
+        a: The first name.
+        b: The second name.
+
+    Returns:
+        The two runs of letters to compare.
+    """
+    left_tokens, right_tokens = _letter_tokens(a), _letter_tokens(b)
+    if len(left_tokens) == len(right_tokens):
+        differing = [
+            (left, right)
+            for left, right in zip(left_tokens, right_tokens)
+            if left != right
+        ]
+        if len(differing) == 1:
+            return differing[0]
+    return letter_skeleton(a), letter_skeleton(b)
 
 
 def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
@@ -785,7 +849,10 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     Returns:
         True when the two names should join one group.
     """
-    left, right = letter_skeleton(a), letter_skeleton(b)
+    # The letters that decide are the differing token when there is one, and
+    # the whole skeleton otherwise. A long shared context must not license a
+    # short difference.
+    left, right = comparable_letters(a, b)
 
     # An empty normalised form is not agreement. Two names built only from
     # characters that the rules drop both normalise to the empty string, and
@@ -816,7 +883,7 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     # against Recell, TSmatKO against TSpatKO. Not one of the 42 pairs it
     # merged there was a typing error. :func:`find_letter_variants` reports the
     # pair instead, so a person still sees it.
-    difference = describe_difference(a, b)
+    difference = classify_letters(left, right)
     if difference == "substitution":
         return False
 

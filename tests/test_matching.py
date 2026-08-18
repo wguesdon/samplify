@@ -970,3 +970,45 @@ def test_a_sign_carries_its_position():
     assert len(matching.group_names(
         ["control+_batch1", "control_batch1+"], method="damerau"
     )) == 2
+
+
+# ── The difference is judged against the token that holds it ───────────────
+
+
+@pytest.mark.parametrize(
+    "left,right,label",
+    [
+        ("sample_A", "sample_AA", "two identifiers"),
+        ("plate_A", "plate_AA", "two plates"),
+        ("SM B from healthy control", "USM B from healthy control", "PRJDB15836"),
+    ],
+)
+def test_shared_context_does_not_license_a_short_difference(left, right, label):
+    """`sample_A` and `sample_AA` differ by one letter in a name of seven.
+
+    The tool split `SMB` from `USMB` and merged the same two samples written
+    out in full, because the words they share made the difference look small.
+    """
+    assert len(matching.group_names([left, right], method="damerau")) == 2, label
+
+
+@pytest.mark.parametrize(
+    "left,right,label",
+    [
+        ("smple_1", "sample_1", "a dropped letter"),
+        ("sampel_5", "sample_5", "a swap"),
+        ("patietn1_batch1", "patient1_batch1", "a swap beside another token"),
+        ("S1_B1", "s1-b1", "formatting"),
+        ("ctrl-r1-batch1", "CTRL_rep1_b1", "abbreviations"),
+    ],
+)
+def test_a_real_typing_error_still_merges(left, right, label):
+    assert len(matching.group_names([left, right], method="damerau")) == 1, label
+
+
+def test_the_whole_name_decides_when_no_single_token_holds_the_difference():
+    """Two names with different token counts have no one differing token."""
+    assert matching.comparable_letters("sample_1", "sample_batch_1") == (
+        "sample", "samplebatch"
+    )
+    assert matching.comparable_letters("sample_A", "sample_AA") == ("a", "aa")

@@ -290,6 +290,25 @@ family, the pair `t` and `tp` is a treatment and a timepoint, and the pair `k`
 and `ko` is a plate letter and a knockout. A short pair therefore has to clear
 the ratio like any other pair, and `wt` against `wnt` scores 0.667.
 
+## The token that holds the difference
+
+Two names that hold the same number of tokens and differ in exactly one are
+judged on that token alone. The rest is context that the two share, and shared
+context must not license a difference.
+
+`sample_A` and `sample_AA` differ by one letter in a name of seven letters, and
+they are two identifiers. Judged on the whole name the difference is one
+insertion in seven, which the slip rule accepts. Judged on the token it is `a`
+against `aa`, which is one letter against two, and no rule accepts that.
+
+The reference corpus held one merge of this shape. samplify kept `SMB` and
+`USMB` apart and merged `SM B from healthy control` with
+`USM B from healthy control`, which are the same two samples written out. The
+words they share made the difference look small.
+
+When the token counts differ, or more than one token differs, the whole letter
+skeleton decides, because no single token holds the difference.
+
 ## The edit cap
 
 A ratio is not enough on its own at the other end of the scale either. A ratio
@@ -547,7 +566,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 507 offline tests, no key and no server
+uv run pytest                 # 516 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
