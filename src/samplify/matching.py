@@ -525,7 +525,10 @@ def _expand_token(token: str) -> str:
         return _without_padding(token)
 
     # A word followed by a number, such as "sample007".
-    split = re.fullmatch(r"([a-z]+)(\d+)", token)
+    # The letters are matched in any script. An ASCII-only class left
+    # `пациент٠١` with its padding while `patient01` lost it, so the rules
+    # backend kept two spellings of one sample apart.
+    split = re.fullmatch(r"([^\W\d_]+)(\d+)", token)
     if split is not None:
         word, number = split.groups()
         return f"{word}{_without_padding(number)}"

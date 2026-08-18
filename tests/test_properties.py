@@ -187,3 +187,59 @@ def test_two_runs_of_apply_give_the_same_mapping(names):
         second = propose_csv(source, "sample_id", method="damerau")
         assert [g.to_dict() for g in first.groups] == [g.to_dict() for g in second.groups]
         assert first.near_misses == second.near_misses
+
+
+# ── No decision and no input can lose a row ────────────────────────────────
+
+
+@given(names=st.lists(sample_names(), min_size=1, max_size=15))
+@settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+def test_apply_keeps_every_row_and_every_other_column(names):
+    """The row count and every column the tool does not write are untouched."""
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "in.csv"
+        with open(source, "w", newline="") as handle:
+            writer = csv_module.writer(handle)
+            writer.writerow(["sample_id", "n"])
+            for position, name in enumerate(names):
+                writer.writerow([name, position])
+
+        mapping = propose_csv(source, "sample_id", method="damerau")
+        mapping.accept_all()
+        output = Path(directory) / "out.csv"
+        apply_mapping(mapping, output_path=output)
+
+        written = pd.read_csv(output, dtype=str, keep_default_na=False)
+        assert list(written["sample_id"]) == names
+        assert list(written["n"]) == [str(i) for i in range(len(names))]
+
+
+@given(
+    names=st.lists(sample_names(), min_size=1, max_size=12),
+    decisions=st.lists(st.booleans(), min_size=1, max_size=12),
+)
+@settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+def test_no_combination_of_decisions_loses_a_row(names, decisions):
+    """A person may accept some groups and reject others in any pattern."""
+    from samplify.mapping import STATUS_ACCEPTED, STATUS_REJECTED
+
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "in.csv"
+        with open(source, "w", newline="") as handle:
+            writer = csv_module.writer(handle)
+            writer.writerow(["sample_id"])
+            for name in names:
+                writer.writerow([name])
+
+        mapping = propose_csv(source, "sample_id", method="damerau")
+        for group, accept in zip(mapping.groups, decisions * len(mapping.groups)):
+            group.status = STATUS_ACCEPTED if accept else STATUS_REJECTED
+            group.final = group.proposed
+
+        output = Path(directory) / "out.csv"
+        apply_mapping(mapping, output_path=output)
+
+        written = pd.read_csv(output, dtype=str, keep_default_na=False)
+        assert list(written["sample_id"]) == names
+        for value in written["sample_id_canonical"]:
+            assert isinstance(value, str) and value.strip()

@@ -134,6 +134,14 @@ class Group:
                 f"Group {self.id} has occurrences of type "
                 f"{type(self.occurrences).__name__}. It must be an object."
             )
+        for name, count in self.occurrences.items():
+            # `rows` sums these, and a null count crashed the sum rather than
+            # refusing the file. The review step prints that number.
+            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                raise ValueError(
+                    f"Group {self.id} counts {name!r} as {count!r}. A count of "
+                    f"rows is a whole number that is not negative."
+                )
         for label, value in (("proposed", self.proposed), ("final", self.final)):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(

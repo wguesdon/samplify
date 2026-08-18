@@ -822,3 +822,16 @@ def test_the_rules_backend_removes_padding_in_any_script_too():
     assert matching.rule_normalise("s01") == matching.rule_normalise("s1") == "sample1"
     assert matching.rule_normalise("sample000") == "sample0"
     assert matching.group_names(["s٠١", "s١"], method="rules") == [["s٠١", "s١"]]
+
+
+def test_the_rules_backend_splits_a_word_from_its_number_in_any_script():
+    """An ASCII-only letter class left `Пациент٠١` with its padding.
+
+    The identity rule had already joined the two names, and the rules backend
+    still kept them apart, so the two disagreed about one sample.
+    """
+    assert matching.rule_normalise("Пациент٠١") == matching.rule_normalise("Пациент١")
+    assert matching.rule_normalise("patient01") == matching.rule_normalise("patient1")
+    assert matching.group_names(["Пациент٠١", "Пациент١"], method="rules") == [
+        ["Пациент٠١", "Пациент١"]
+    ]

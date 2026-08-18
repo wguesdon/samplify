@@ -13,6 +13,28 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.7] - 2026-08-18
+
+The fourteenth review reported that no finding is major.
+
+### Fixed
+
+- A count of rows must be a whole number that is not negative. `rows` sums the
+  counts, and a null count crashed that sum with a `TypeError` rather than
+  refusing the file. The review step prints that number to the person who is
+  deciding.
+- The rules backend splits a word from its number in any script. An ASCII-only
+  letter class left `Пациент٠١` with its padding while `patient01` lost it, so
+  the identity rule had joined the two names and the rules backend still kept
+  them apart.
+
+### Added
+
+- Two property tests over generated CSV files. The first checks that `apply`
+  keeps every row and every column it does not write. The second accepts and
+  rejects groups in every combination and checks that no row is lost and no
+  canonical name is empty.
+
 ## [0.10.6] - 2026-08-18
 
 The thirteenth review found that the guard added in 0.10.0 and 0.10.3 was

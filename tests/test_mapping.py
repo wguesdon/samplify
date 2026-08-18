@@ -462,3 +462,20 @@ def test_occurrences_must_be_an_object():
          "status": STATUS_ACCEPTED, "occurrences": None}
     )
     assert restored.occurrences == {}
+
+
+@pytest.mark.parametrize("count", [None, -1, True, "two", 1.5])
+def test_a_count_of_rows_must_be_a_whole_number(count):
+    """`rows` sums these, and a null count crashed the sum with a TypeError
+    rather than refusing the file. The review step prints that number."""
+    group = Group(id=1, members=["s_1"], proposed="s1", final="s1",
+                  status=STATUS_ACCEPTED, occurrences={"s_1": count})
+    with pytest.raises(ValueError, match="count of rows"):
+        group.validate()
+
+
+def test_an_ordinary_count_is_accepted():
+    group = Group(id=1, members=["s_1"], proposed="s1", final="s1",
+                  status=STATUS_ACCEPTED, occurrences={"s_1": 2})
+    group.validate()
+    assert group.rows == 2
