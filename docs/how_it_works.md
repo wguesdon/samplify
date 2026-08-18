@@ -33,7 +33,9 @@ it writes no file. Use it before you run a backend on a file.
 ## The mapping file
 
 The mapping file is the file that a person reviews, that git stores and that
-`apply` reads. It holds one group for each candidate sample.
+`apply` reads. It holds one group for each candidate sample. The example below
+is shortened, and a real file also records the input path, the column, the
+diagnosis, the summary and the times.
 
 ```json
 {
@@ -41,6 +43,7 @@ The mapping file is the file that a person reviews, that git stores and that
   "method": "damerau",
   "model": null,
   "provider": null,
+  "base_url": null,
   "reviewed": true,
   "near_misses": [["patient111_batch2", "patient11_batch2"]],
   "groups": [
@@ -402,7 +405,8 @@ The result therefore never depends on the order of the input.
 
 ## The guards
 
-The `apply` command refuses to run in seven conditions.
+The `apply` command refuses to run in each condition below. The list carries no
+count, because a count goes stale and a list does not.
 
 1. A group still has the status `proposed`. No person made a decision, so
    samplify has nothing to apply.
@@ -419,6 +423,11 @@ The `apply` command refuses to run in seven conditions.
    a new column, and it overwrites no column of the input.
 7. No name of the mapping appears in the column. The mapping belongs to another
    file, and applying it would change nothing and report every name as changed.
+8. Two groups claim one name. One group would decide the name of that sample
+   and the other would be ignored, so `final_mapping` refuses instead.
+9. A group holds a field that cannot decide a name. `Group.validate` holds
+   every one of those checks, and both the file reader and a caller that builds
+   a group in Python call it.
 
 samplify merges the names inside one group, and that is not a collision. That
 operation is the purpose of the tool.
