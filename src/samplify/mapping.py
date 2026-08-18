@@ -83,6 +83,44 @@ class Group:
         """The number of data rows this group covers."""
         return sum(self.occurrences.get(m, 0) for m in self.members)
 
+    def validate(self) -> None:
+        """Check every field that decides a name, or raise.
+
+        Reading a mapping file runs the same checks through
+        :meth:`from_dict`, and a caller that builds a Group in Python reaches
+        none of them. Both paths call this one method, so the two cannot drift
+        apart. A string is the shape that matters most here: it is iterable, so
+        ``members="AB"`` reads as the two samples ``A`` and ``B`` everywhere
+        that a list is expected.
+
+        Raises:
+            ValueError: If any field cannot decide a name.
+        """
+        if not isinstance(self.members, list):
+            raise ValueError(
+                f"Group {self.id} has members of type "
+                f"{type(self.members).__name__}. It must be a list of names."
+            )
+        if not self.members:
+            raise ValueError(f"Group {self.id} has no members.")
+        for member in self.members:
+            if not isinstance(member, str) or not member.strip():
+                raise ValueError(
+                    f"Group {self.id} has the member {member!r}. A member "
+                    f"must be a string that holds a character."
+                )
+        if self.status not in STATUSES:
+            raise ValueError(
+                f"Group {self.id} has status {self.status!r}, which is not one "
+                f"of {STATUSES}."
+            )
+        for label, value in (("proposed", self.proposed), ("final", self.final)):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    f"Group {self.id} has {label} {value!r}. A canonical name "
+                    f"must be a string that holds a character."
+                )
+
     def resolved(self) -> dict[str, str]:
         """Return the name each member takes once the decision is applied.
 
@@ -91,25 +129,15 @@ class Group:
             leaves every member unchanged.
 
         Raises:
-            ValueError: If the group is still awaiting a decision.
+            ValueError: If the group is still awaiting a decision, or if any
+                field of it cannot decide a name.
         """
-        # Reading a mapping file checks each field, and a caller that builds a
-        # Group in Python does not go through that check. This is the one place
-        # where a decision becomes a new name, so it checks again.
-        if self.status not in STATUSES:
-            raise ValueError(
-                f"Group {self.id} has status {self.status!r}, which is not one "
-                f"of {STATUSES}."
-            )
+        # This is the one place where a decision becomes a new name.
+        self.validate()
         if self.status == STATUS_PROPOSED:
             raise ValueError(f"Group {self.id} is still proposed and has no decision.")
         if self.status == STATUS_REJECTED:
             return {member: member for member in self.members}
-        if not isinstance(self.final, str) or not self.final.strip():
-            raise ValueError(
-                f"Group {self.id} would rename every member to {self.final!r}. "
-                f"A canonical name must be a string that holds a character."
-            )
         return {member: self.final for member in self.members}
 
     def to_dict(self) -> dict[str, Any]:
@@ -145,55 +173,30 @@ class Group:
         for key in ("id", "members", "proposed", "final", "status"):
             if key not in data:
                 raise ValueError(f"Group is missing the required key {key!r}.")
-        if data["status"] not in STATUSES:
-            raise ValueError(
-                f"Group {data['id']} has status {data['status']!r}, "
-                f"which is not one of {STATUSES}."
-            )
-        # A string is iterable, so a members value of "AB" would pass every
-        # check below and become the two samples A and B.
-        if not isinstance(data["members"], list):
-            raise ValueError(
-                f"Group {data['id']} has members of type "
-                f"{type(data['members']).__name__}. It must be a list of names."
-            )
-        if not data["members"]:
-            raise ValueError(f"Group {data['id']} has no members.")
-
-        # A name is checked here and not coerced. str(None) gives the string
-        # "None", and a group carrying it renames every member of a sample to
-        # the four characters None at the apply step.
-        for key in ("proposed", "final"):
-            if not isinstance(data[key], str) or not data[key].strip():
-                raise ValueError(
-                    f"Group {data['id']} has {key} {data[key]!r}. A canonical "
-                    f"name must be a string that holds a character."
-                )
-        for member in data["members"]:
-            if not isinstance(member, str) or not member.strip():
-                raise ValueError(
-                    f"Group {data['id']} has the member {member!r}. A member "
-                    f"must be a string that holds a character."
-                )
         # int(None) raises a TypeError, and this class documents ValueError.
-        # Every malformed field has to answer with the same kind of error, or
-        # the caller has to catch two.
         try:
             identifier = int(data["id"])
         except (TypeError, ValueError):
             raise ValueError(
                 f"A group has the id {data['id']!r}. An id must be a number."
             ) from None
-        return cls(
+
+        group = cls(
             id=identifier,
-            members=list(data["members"]),
-            proposed=str(data["proposed"]),
-            final=str(data["final"]),
-            status=str(data["status"]),
+            members=data["members"] if isinstance(data["members"], list)
+            else data["members"],
+            proposed=data["proposed"],
+            final=data["final"],
+            status=data["status"],
             occurrences=dict(data.get("occurrences", {})),
             method=str(data.get("method", "rules")),
             min_similarity=data.get("min_similarity"),
         )
+        # One method holds every check, so the file reader and a caller that
+        # builds a Group in Python can never disagree about what is valid.
+        group.validate()
+        group.members = list(group.members)
+        return group
 
 
 @dataclass

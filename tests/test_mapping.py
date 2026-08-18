@@ -370,8 +370,30 @@ def test_resolved_refuses_a_status_it_does_not_know(status):
 @pytest.mark.parametrize("final", ["", "   ", None, 7])
 def test_resolved_refuses_to_rename_a_member_to_nothing(final):
     group = Group(id=1, members=["a_1"], proposed="a1", final=final, status=STATUS_ACCEPTED)
-    with pytest.raises(ValueError, match="would rename every member"):
+    with pytest.raises(ValueError, match="must be a string that holds a character"):
         group.resolved()
+
+
+@pytest.mark.parametrize("members", ["AB", "", None, 7, ["a_1", ""], ["a_1", None], []])
+def test_resolved_refuses_members_that_cannot_name_a_sample(members):
+    """A string is iterable, so members of "AB" read as the two samples A and B
+    everywhere that a list is expected."""
+    group = Group(id=1, members=members, proposed="a1", final="a1",
+                  status=STATUS_ACCEPTED)
+    with pytest.raises(ValueError):
+        group.resolved()
+
+
+def test_one_method_holds_every_check():
+    """The file reader and the Python API call the same validator, so the two
+    cannot drift apart about what a valid group is."""
+    good = Group(id=1, members=["a_1"], proposed="a1", final="a1",
+                 status=STATUS_ACCEPTED)
+    good.validate()
+
+    from_file = Group.from_dict(good.to_dict())
+    from_file.validate()
+    assert from_file.to_dict() == good.to_dict()
 
 
 @pytest.mark.parametrize("entry", [None, "text", 7, []])

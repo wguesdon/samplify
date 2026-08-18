@@ -13,6 +13,23 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.9.9] - 2026-08-18
+
+An eighth review found one defect, and it was the last of a class that seven
+reviews had reported one instance at a time. The class is closed rather than
+patched again.
+
+### Changed
+
+- `Group.validate` holds every check that a group has to pass, and both paths
+  call it. `Group.from_dict` called the checks for a file, `Group.resolved`
+  called a different and shorter set for a caller building a group in Python,
+  and every review found one more field that only the first path checked. The
+  two cannot drift apart now.
+- The last instance found: `members` given as a string. A string is iterable,
+  so `members="AB"` read as the two samples `A` and `B` everywhere a list was
+  expected, and `resolved` merged them both into one name.
+
 ## [0.9.8] - 2026-08-18
 
 A seventh review found two defects, both of them in the same place: the Python

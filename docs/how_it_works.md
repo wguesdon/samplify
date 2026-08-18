@@ -504,7 +504,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 301 offline tests, no key and no server
+uv run pytest                 # 310 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
