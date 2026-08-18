@@ -473,10 +473,14 @@ class MappingFile:
                 )
 
         for pair in data.get("near_misses") or []:
-            if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            if (
+                not isinstance(pair, (list, tuple))
+                or len(pair) != 2
+                or not all(isinstance(name, str) and name.strip() for name in pair)
+            ):
                 raise ValueError(
                     f"The 'near_misses' field holds {pair!r}. Every entry is a "
-                    f"pair of names."
+                    f"pair of names, and a name is text that holds a character."
                 )
 
         reviewed = data.get("reviewed", False)

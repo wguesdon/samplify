@@ -13,6 +13,23 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.11.3] - 2026-08-18
+
+The nineteenth review reported that no finding is major.
+
+### Fixed
+
+- Each name inside a `near_misses` pair must be text that holds a character.
+  The pair itself was checked and its two entries were not, and the figure
+  reads the length of each name, so `samplify plot` raised a `TypeError` on a
+  file holding a number there.
+
+### Added
+
+- Tests for every spelling of one path against the identity guard, which are a
+  dot segment, a parent segment and a doubled separator, and a test for an
+  alias that is the parent directory rather than the file.
+
 ## [0.11.2] - 2026-08-18
 
 The eighteenth review found that the self-overwrite guard compares the text of

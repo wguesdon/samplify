@@ -644,3 +644,11 @@ def test_a_falsey_occurrences_is_refused_and_not_read_as_empty(value):
     }
     with pytest.raises(ValueError):
         Group.from_dict(document)
+
+
+@pytest.mark.parametrize("pairs", [[[1, 2]], [["a", None]], [["a", ""]], [[True, "b"]]])
+def test_a_near_miss_pair_holds_two_names(pairs):
+    """The figure reads the length of each name, so a number there raised a
+    TypeError from `samplify plot` rather than refusing the file."""
+    with pytest.raises(ValueError, match="pair of names"):
+        MappingFile.from_dict({"schema_version": 1, "groups": [], "near_misses": pairs})
