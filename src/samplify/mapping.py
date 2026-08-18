@@ -96,6 +96,11 @@ class Group:
         Raises:
             ValueError: If any field cannot decide a name.
         """
+        if isinstance(self.id, bool) or not isinstance(self.id, int):
+            raise ValueError(
+                f"A group has the id {self.id!r}. An id must be a number. "
+                f"bool is a subclass of int in Python, so true is refused too."
+            )
         if not isinstance(self.members, list):
             raise ValueError(
                 f"Group {self.id} has members of type "
@@ -123,6 +128,11 @@ class Group:
             raise ValueError(
                 f"Group {self.id} has status {self.status!r}, which is not one "
                 f"of {STATUSES}."
+            )
+        if not isinstance(self.occurrences, dict):
+            raise ValueError(
+                f"Group {self.id} has occurrences of type "
+                f"{type(self.occurrences).__name__}. It must be an object."
             )
         for label, value in (("proposed", self.proposed), ("final", self.final)):
             if not isinstance(value, str) or not value.strip():
@@ -204,7 +214,7 @@ class Group:
             proposed=data["proposed"],
             final=data["final"],
             status=data["status"],
-            occurrences=dict(data.get("occurrences", {})),
+            occurrences=data.get("occurrences") or {},
             method=str(data.get("method", "rules")),
             min_similarity=data.get("min_similarity"),
         )
@@ -212,6 +222,7 @@ class Group:
         # builds a Group in Python can never disagree about what is valid.
         group.validate()
         group.members = list(group.members)
+        group.occurrences = dict(group.occurrences)
         return group
 
 

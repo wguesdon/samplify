@@ -560,11 +560,14 @@ def apply_mapping(
             f"Check the --data and --column options."
         )
 
-    # Every output goes somewhere else. samplify promises that the input
-    # survives the run, so that a person can read the original spelling after a
-    # decision they regret. One character of a shell command is the difference
-    # between --output clean.csv and --output data.csv, and a log written over
-    # the input would lose the file completely.
+    # Every output goes somewhere else, and this command reads two files. The
+    # data CSV holds the original spelling and the mapping file holds the
+    # decisions a person made, and neither survives being written over. One
+    # character of a shell command is the difference between
+    # --output clean.csv and --output data.csv.
+    inputs = [("the input", path)]
+    if mapping_path is not None:
+        inputs.append(("the mapping file", Path(mapping_path)))
     for label, destination in (
         ("--output", output_path),
         ("--json-log", json_log_path),
@@ -572,12 +575,13 @@ def apply_mapping(
     ):
         if destination is None:
             continue
-        if Path(destination).resolve() == path.resolve():
-            raise ValueError(
-                f"{label} points at {path}, which is the input. samplify writes "
-                f"no output over its own input, so that the original spelling "
-                f"survives the run."
-            )
+        for description, source in inputs:
+            if Path(destination).resolve() == source.resolve():
+                raise ValueError(
+                    f"{label} points at {source}, which is {description}. "
+                    f"samplify writes no output over a file it reads, so that "
+                    f"the original spelling and the decisions both survive."
+                )
 
     if canonical_column is None:
         canonical_column = f"{resolved_column}_canonical"

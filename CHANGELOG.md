@@ -13,6 +13,32 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.6] - 2026-08-18
+
+The thirteenth review found that the guard added in 0.10.0 and 0.10.3 was
+incomplete, and that the gap could destroy a reviewed mapping file.
+
+### Fixed
+
+- `apply` refuses an output that points at the mapping file, not only one that
+  points at the data CSV. The command reads two files and neither survives
+  being written over, and `apply mapping.json --output mapping.json` replaced
+  the decisions a person had made with CSV data.
+- `Group.validate` checks the id, so the Python API refuses what the file
+  reader already refused. `Group(id=True)` validated and resolved, because
+  `bool` is a subclass of `int`.
+- `occurrences` must be an object. `dict(None)` raises a `TypeError`, and this
+  class documents `ValueError`. A file that holds `null` for the field reads as
+  empty.
+
+### Added
+
+- `tests/test_no_self_overwrite.py` drives every command with every output
+  aimed at every file that command reads. Three reviews found one instance of
+  this fault each, and each fix guarded one more path. A new output option now
+  has to be added to that table, or the test says the guard is missing. The
+  test was run against a disabled guard first, and it failed as it should.
+
 ## [0.10.5] - 2026-08-18
 
 The twelfth review reported that no finding is major, and it was the second

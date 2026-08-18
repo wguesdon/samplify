@@ -847,3 +847,28 @@ def test_apply_writes_to_another_path_as_before(tmp_path):
     apply_mapping(mapping, output_path=output, csv_log_path=tmp_path / "changes.csv")
     assert output.exists()
     assert source.read_text() == "sample_id\nS1_B1\ns1-b1\n"
+
+
+@pytest.mark.parametrize("option", ["output_path", "json_log_path", "csv_log_path"])
+def test_apply_writes_no_output_over_the_mapping_file(tmp_path, option):
+    """This command reads two files, and neither survives being written over.
+
+    The data CSV holds the original spelling and the mapping file holds the
+    decisions a person made. The first was guarded and the second was not, so
+    `apply mapping.json --output mapping.json` replaced a reviewed mapping with
+    CSV data.
+    """
+    from samplify import mapping as mapping_module
+
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    mapping_file = tmp_path / "mapping.json"
+    mapping = _accepted(source)
+    mapping_module.write(mapping, mapping_file)
+    before = mapping_file.read_text()
+
+    with pytest.raises(ValueError, match="the mapping file"):
+        apply_mapping(mapping, mapping_path=str(mapping_file),
+                      **{option: mapping_file})
+
+    assert mapping_file.read_text() == before

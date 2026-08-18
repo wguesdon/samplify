@@ -434,3 +434,31 @@ def test_a_repeated_member_is_refused():
         group.validate()
     with pytest.raises(ValueError, match="more than once"):
         group.resolved()
+
+
+def test_validate_checks_the_id_as_the_file_reader_does():
+    """`Group(id=True)` validated and resolved through the Python API.
+
+    bool is a subclass of int in Python, so the id has to be refused by name.
+    """
+    group = Group(id=True, members=["a_1"], proposed="a1", final="a1",
+                  status=STATUS_ACCEPTED)
+    with pytest.raises(ValueError, match="An id must be a number"):
+        group.validate()
+    with pytest.raises(ValueError, match="An id must be a number"):
+        group.resolved()
+
+
+def test_occurrences_must_be_an_object():
+    """`dict(None)` raises a TypeError, and this class documents ValueError."""
+    group = Group(id=1, members=["a_1"], proposed="a1", final="a1",
+                  status=STATUS_ACCEPTED, occurrences=None)
+    with pytest.raises(ValueError, match="must be an object"):
+        group.validate()
+
+    # A file that omits the field, or holds null for it, reads as empty.
+    restored = Group.from_dict(
+        {"id": 1, "members": ["a_1"], "proposed": "a1", "final": "a1",
+         "status": STATUS_ACCEPTED, "occurrences": None}
+    )
+    assert restored.occurrences == {}
