@@ -198,3 +198,37 @@ def test_every_call_that_writes_a_file_has_a_guarded_destination():
         "mapping.py:replace",        # the same, put in place
         "plots.py:savefig",          # the figure
     ]), found
+
+
+@pytest.mark.parametrize(
+    "command,argv,options",
+    [
+        (
+            "propose",
+            lambda w: ["propose", str(w["data"]), "-c", "sample_id", "-M",
+                       "damerau", "--yes"],
+            ["--output", "--plot"],
+        ),
+        ("apply", lambda w: ["apply", str(w["mapping"])],
+         ["--output", "--json-log", "--csv-log"]),
+    ],
+    ids=["propose", "apply"],
+)
+def test_no_two_outputs_of_one_command_name_one_file(workspace, command, argv, options):
+    """The second file written replaces the first.
+
+    `apply --output clean.csv --json-log clean.csv` wrote the CSV and then put
+    the log where the cleaned data should have been.
+    """
+    import itertools
+
+    for first, second in itertools.combinations(options, 2):
+        target = workspace["root"] / "shared.out"
+        if target.exists():
+            target.unlink()
+
+        arguments = argv(workspace) + [first, str(target), second, str(target)]
+        if command == "propose" and "--output" not in (first, second):
+            arguments += ["--output", str(workspace["root"] / "spare.json")]
+
+        assert cli.main(arguments) == 1, (command, first, second)
