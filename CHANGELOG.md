@@ -13,6 +13,16 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.1] - 2026-08-18
+
+### Fixed
+
+- A group that lists one member twice is refused. It misled the person at the
+  moment they decide: `rows` sums the occurrences once for each entry, so a
+  sample that appears three times was reported as six rows, and `is_merge` read
+  two entries as two names, so a group holding one name asked for a decision
+  that had nothing in it.
+
 ## [0.10.0] - 2026-08-18
 
 A ninth review found one defect.

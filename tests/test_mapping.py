@@ -417,3 +417,20 @@ def test_a_name_claimed_by_two_groups_is_refused_in_memory():
     )
     with pytest.raises(ValueError, match="belongs to one group"):
         result.final_mapping()
+
+
+def test_a_repeated_member_is_refused():
+    """It misleads the person at the moment they decide.
+
+    `rows` sums the occurrences once for each entry, so it doubles, and
+    `is_merge` reads two entries as two names, so a group holding one name asks
+    for a decision that has nothing in it.
+    """
+    group = Group(
+        id=1, members=["sample_1", "sample_1"], proposed="sample1",
+        final="sample1", status=STATUS_ACCEPTED, occurrences={"sample_1": 3},
+    )
+    with pytest.raises(ValueError, match="more than once"):
+        group.validate()
+    with pytest.raises(ValueError, match="more than once"):
+        group.resolved()

@@ -109,6 +109,16 @@ class Group:
                     f"Group {self.id} has the member {member!r}. A member "
                     f"must be a string that holds a character."
                 )
+        # A repeated member misleads the person who is deciding. `rows` sums
+        # the occurrences once for each entry, so it doubles, and `is_merge`
+        # reads two entries as two names, so a group holding one name asks for
+        # a decision that has nothing in it.
+        repeated = sorted({m for m in self.members if self.members.count(m) > 1})
+        if repeated:
+            raise ValueError(
+                f"Group {self.id} lists {repeated[0]!r} more than once. Every "
+                f"member appears one time."
+            )
         if self.status not in STATUSES:
             raise ValueError(
                 f"Group {self.id} has status {self.status!r}, which is not one "
