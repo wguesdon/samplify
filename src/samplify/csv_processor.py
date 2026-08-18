@@ -24,6 +24,31 @@ from .harmonizer import DEFAULT_PROVIDER, harmonize, resolve_base_url, resolve_m
 from .mapping import Group, MappingFile
 
 
+def is_the_same_file(destination: str | os.PathLike, source: str | os.PathLike) -> bool:
+    """Report whether two paths name one file.
+
+    A hard link is a second name for one file, and two names that differ still
+    reach the same bytes. ``Path.resolve`` follows a symbolic link and knows
+    nothing of a hard link, so comparing the resolved names let an output alias
+    of the input through the guard and the input was overwritten.
+
+    Args:
+        destination: The path a command would write.
+        source: A path the command reads.
+
+    Returns:
+        True when the two paths name one file, or when the destination does not
+        exist yet and its resolved name equals the resolved source.
+    """
+    destination, source = Path(destination), Path(source)
+    try:
+        if destination.exists() and source.exists():
+            return destination.samefile(source)
+    except OSError:
+        pass
+    return destination.resolve() == source.resolve()
+
+
 def _read_csv(path: Path, column: str) -> pd.DataFrame:
     """Read a CSV without letting pandas reinterpret an identifier.
 
@@ -617,7 +642,7 @@ def apply_mapping(
         if destination is None:
             continue
         for description, source in inputs:
-            if Path(destination).resolve() == source.resolve():
+            if is_the_same_file(destination, source):
                 raise ValueError(
                     f"{label} points at {source}, which is {description}. "
                     f"samplify writes no output over a file it reads, so that "

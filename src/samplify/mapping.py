@@ -142,6 +142,21 @@ class Group:
                     f"Group {self.id} counts {name!r} as {count!r}. A count of "
                     f"rows is a whole number that is not negative."
                 )
+        if not isinstance(self.method, str) or not self.method:
+            raise ValueError(
+                f"Group {self.id} names the method {self.method!r}. It must be "
+                f"text."
+            )
+        if self.min_similarity is not None and (
+            isinstance(self.min_similarity, bool)
+            or not isinstance(self.min_similarity, (int, float))
+            or not 0.0 <= self.min_similarity <= 1.0
+        ):
+            raise ValueError(
+                f"Group {self.id} records a similarity of "
+                f"{self.min_similarity!r}. A similarity is a ratio between 0.0 "
+                f"and 1.0, or it is absent."
+            )
         for label, value in (("proposed", self.proposed), ("final", self.final)):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(
@@ -222,8 +237,8 @@ class Group:
             proposed=data["proposed"],
             final=data["final"],
             status=data["status"],
-            occurrences=data.get("occurrences") or {},
-            method=str(data.get("method", "rules")),
+            occurrences={} if data.get("occurrences") is None else data["occurrences"],
+            method=data.get("method", "rules"),
             min_similarity=data.get("min_similarity"),
         )
         # One method holds every check, so the file reader and a caller that

@@ -78,6 +78,29 @@ def test_no_command_writes_over_a_file_it_reads(workspace, capsys, command, argv
             assert target.read_bytes() == before, f"{command} {option} changed {name}"
 
 
+@pytest.mark.parametrize("link", ["hard", "symbolic"])
+def test_an_alias_of_the_input_is_the_input(workspace, capsys, link):
+    """A second name for one file still reaches the same bytes.
+
+    `Path.resolve` follows a symbolic link and knows nothing of a hard link, so
+    comparing the resolved names let a hard-link alias of the input through and
+    the input was overwritten.
+    """
+    data: Path = workspace["data"]
+    alias = workspace["root"] / f"alias_{link}.csv"
+    if link == "hard":
+        alias.hardlink_to(data)
+    else:
+        alias.symlink_to(data)
+
+    before = data.read_bytes()
+    code = cli.main(["apply", str(workspace["mapping"]), "--output", str(alias)])
+
+    assert code == 1
+    assert "no output over" in " ".join(capsys.readouterr().out.split())
+    assert data.read_bytes() == before
+
+
 def test_the_ordinary_paths_still_write(workspace):
     """The guard refuses nothing that points somewhere else."""
     root = workspace["root"]

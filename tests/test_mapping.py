@@ -587,3 +587,60 @@ def test_no_shape_of_any_field_answers_with_the_wrong_error():
                 raise AssertionError(
                     f"{field}={shape!r} raised {type(exc).__name__}: {exc}"
                 ) from exc
+
+
+@pytest.mark.parametrize("value", [1, "", None, [], True])
+def test_a_group_names_its_method_in_text(value):
+    group = Group(id=1, members=["s_1"], proposed="s1", final="s1",
+                  status=STATUS_ACCEPTED, method=value)
+    with pytest.raises(ValueError, match="must be text"):
+        group.validate()
+
+
+@pytest.mark.parametrize("value", ["x", 1.5, -0.1, True, []])
+def test_a_recorded_similarity_is_a_ratio(value):
+    """The review step prints this number to the person who is deciding."""
+    group = Group(id=1, members=["s_1"], proposed="s1", final="s1",
+                  status=STATUS_ACCEPTED, min_similarity=value)
+    with pytest.raises(ValueError, match="ratio between 0.0 and 1.0"):
+        group.validate()
+
+
+@pytest.mark.parametrize("value", [0.0, 0.5, 1.0, 1, None])
+def test_an_ordinary_similarity_is_accepted(value):
+    group = Group(id=1, members=["s_1"], proposed="s1", final="s1",
+                  status=STATUS_ACCEPTED, min_similarity=value)
+    group.validate()
+
+
+def test_no_shape_of_any_group_field_answers_with_the_wrong_error():
+    """The same sweep as the mapping file, for every field of a group."""
+    shapes = [None, True, False, 0, 1, -1, 3.5, "", "text", [], {}, ["a", None]]
+    base = {"id": 1, "members": ["s_1"], "proposed": "s1", "final": "s1",
+            "status": STATUS_ACCEPTED, "occurrences": {"s_1": 1},
+            "method": "damerau", "min_similarity": 0.9}
+
+    for field in base:
+        for shape in shapes:
+            document = dict(base)
+            document[field] = shape
+            try:
+                Group.from_dict(document).validate()
+            except ValueError:
+                pass
+            except Exception as exc:  # noqa: BLE001 - the point of the test
+                raise AssertionError(
+                    f"{field}={shape!r} raised {type(exc).__name__}: {exc}"
+                ) from exc
+
+
+@pytest.mark.parametrize("value", [False, 0, "", [], "text", 7])
+def test_a_falsey_occurrences_is_refused_and_not_read_as_empty(value):
+    """`data.get("occurrences") or {}` turned False into an empty object, so a
+    malformed file passed as a valid one."""
+    document = {
+        "id": 1, "members": ["s_1"], "proposed": "s1", "final": "s1",
+        "status": STATUS_ACCEPTED, "occurrences": value,
+    }
+    with pytest.raises(ValueError):
+        Group.from_dict(document)

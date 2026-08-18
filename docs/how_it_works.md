@@ -426,7 +426,10 @@ count, because a count goes stale and a list does not.
    file, and applying it would change nothing and report every name as changed.
 8. Two groups claim one name. One group would decide the name of that sample
    and the other would be ignored, so `final_mapping` refuses instead.
-9. An output path is a path the command reads. `apply` reads two files, the
+9. An output path names a file the command reads. A hard link is a second name
+   for one file, so the comparison is file identity and not the text of the
+   path. `Path.resolve` follows a symbolic link and knows nothing of a hard
+   link. `apply` reads two files, the
    data CSV and the mapping file, and it refuses an output that points at
    either. `propose` refuses it for its mapping file and its figure, and `plot`
    for its figure. `tests/test_no_self_overwrite.py` drives every command with
@@ -522,7 +525,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 411 offline tests, no key and no server
+uv run pytest                 # 435 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

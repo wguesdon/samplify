@@ -13,6 +13,33 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.11.2] - 2026-08-18
+
+The eighteenth review found that the self-overwrite guard compares the text of
+a path, and that a second name for one file walks through it.
+
+### Fixed
+
+- An output that names the same file as an input is refused, and not only an
+  output that spells the same path. A hard link is a second name for one file,
+  and `Path.resolve` follows a symbolic link while knowing nothing of a hard
+  link, so `apply mapping.json --output alias.csv` overwrote the input through
+  its alias. The comparison is `Path.samefile` when both paths exist, and the
+  resolved names when the output does not exist yet.
+- A group whose `occurrences` is `false`, `0`, `""` or `[]` is refused.
+  `data.get("occurrences") or {}` read every one of those as an empty object,
+  so a malformed file passed as a valid one.
+- `Group.validate` checks the last two fields it did not: `method` must be text
+  and `min_similarity` must be a ratio between 0.0 and 1.0 or absent. The review
+  step prints that number to the person who is deciding.
+
+### Added
+
+- A test that builds a hard link and a symbolic link to the input and gives
+  each to `apply --output`.
+- A sweep over every field of a group and every wrong shape, matching the one
+  the mapping file already had.
+
 ## [0.11.1] - 2026-08-18
 
 The seventeenth review reported that it found no major defect. Its one finding

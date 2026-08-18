@@ -26,7 +26,7 @@ from rich.table import Table
 
 from . import mapping as mapping_module
 from . import matching
-from .csv_processor import apply_mapping, propose, propose_csv
+from .csv_processor import apply_mapping, is_the_same_file, propose, propose_csv
 from .harmonizer import (
     DEFAULT_MODEL,
     DEFAULT_OLLAMA_MODEL,
@@ -224,7 +224,7 @@ def _run_propose(args: argparse.Namespace) -> int:
     for label, destination in (("--output", output), ("--plot", args.plot)):
         if destination is None:
             continue
-        if Path(destination).resolve() == source.resolve():
+        if is_the_same_file(destination, source):
             _print_error(
                 f"{label} points at {source}, which is the input. samplify "
                 f"writes no output over its own input."
@@ -318,7 +318,7 @@ def _run_plot(args: argparse.Namespace) -> int:
     """Draw the quality control figure for an existing mapping file."""
     # The figure goes somewhere else. Every other command already refuses to
     # write over its own input, and this one is the last of them.
-    if Path(args.output).resolve() == Path(args.mapping).resolve():
+    if is_the_same_file(args.output, args.mapping):
         _print_error(
             f"--output points at {args.mapping}, which is the input. samplify "
             f"writes no output over its own input."
