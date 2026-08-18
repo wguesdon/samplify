@@ -33,6 +33,11 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 - A test that fails if the near-miss search becomes quadratic again, and four
   tests for the positions and the shapes that the index has to reach.
+- A GitHub Actions workflow in `.github/workflows/ci.yml`. The `test` job runs
+  the offline suite and the smoke test on Python 3.10, 3.11, 3.12 and 3.13. The
+  `package` job builds the wheel, installs it and runs it from an empty
+  directory, which is the check that the `src` layout exists for. The suite
+  imports the working copy and cannot see a file that the wheel leaves out.
 
 ## [0.4.0] - 2026-08-18
 

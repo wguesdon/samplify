@@ -1,0 +1,71 @@
+name: tests
+
+# The offline suite alone runs here. The live tests need an OpenRouter key and
+# the local tests need a running ollama server, so both stay out of CI.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the project and the plot extra
+        run: uv sync --frozen --all-extras --python ${{ matrix.python-version }}
+
+      - name: Run the offline suite
+        run: uv run --frozen --python ${{ matrix.python-version }} pytest
+
+      - name: Run the command line end to end
+        run: ./tests/smoke_test.sh
+
+  package:
+    name: build and install the wheel
+    runs-on: ubuntu-latest
+
+    # This job is the reason the package sits in src/. The suite above imports
+    # the working copy, so it cannot see a file that the wheel leaves out. This
+    # job runs from an empty directory against the installed package alone.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Build the wheel and the source distribution
+        run: uv build
+
+      - name: Import the installed package from an empty directory
+        run: |
+          cd "$(mktemp -d)"
+          uv run --no-project --with "$GITHUB_WORKSPACE"/dist/*.whl python -c "
+          import pathlib, samplify
+          from samplify import apply_mapping, propose_csv
+          location = pathlib.Path(samplify.__file__).parent
+          print(samplify.__version__, location)
+          assert 'site-packages' in str(location), location
+          "
+
+      - name: Run the console script from an empty directory
+        run: |
+          cd "$(mktemp -d)"
+          uv run --no-project --with "$GITHUB_WORKSPACE"/dist/*.whl \
+            samplify propose "$GITHUB_WORKSPACE/example/cohort_messy.csv" \
+            -c sample_id -M damerau -o mapping.json --yes
+          uv run --no-project --with "$GITHUB_WORKSPACE"/dist/*.whl \
+            samplify apply mapping.json --output clean.csv
+          test -s clean.csv

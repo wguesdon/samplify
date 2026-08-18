@@ -1,5 +1,7 @@
 # samplify
 
+[![tests](https://github.com/wguesdon/samplify/actions/workflows/ci.yml/badge.svg)](https://github.com/wguesdon/samplify/actions/workflows/ci.yml)
+
 samplify finds the sample names in a CSV column that are one sample with several
 spellings. It proposes one canonical name for each group, and you confirm each
 group before samplify changes a name.

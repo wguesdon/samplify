@@ -409,6 +409,12 @@ The `local` tests run the whole workflow against a real ollama server. They chec
 what samplify guarantees and not what the model prefers. One of them asserts that
 no group mixes two different samples of the catalogue.
 
+GitHub Actions runs the offline suite and the smoke test on Python 3.10, 3.11,
+3.12 and 3.13. A second job builds the wheel, installs it and runs it from an
+empty directory. That job is the reason the package sits in `src/`. The suite
+imports the working copy, so it cannot see a file that the wheel leaves out, and
+only a build and an install can.
+
 ## Design rules
 
 - The numbers identify the sample, and a letter that follows a number also
