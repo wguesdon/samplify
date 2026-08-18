@@ -15,6 +15,13 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 ## [0.12.2] - 2026-08-19
 
+### Added
+
+- `tests/test_the_claims.py` quotes each promise that `README.md` makes and
+  tests the code against it. A document is where a person learns what a tool
+  guarantees, so a claim in it is a promise, and the test fails if one of those
+  sentences is reworded without the test moving too.
+
 ### Fixed
 
 - `propose` writes all of its files or none of them, in the same way. The

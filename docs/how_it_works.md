@@ -544,14 +544,16 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 489 offline tests, no key and no server
+uv run pytest                 # 498 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
 ```
 
 The offline tests cover every backend, the guards, the near-miss rule, the figure
-and the reproducibility claim. `tests/test_properties.py` generates names rather
+and the reproducibility claim. `tests/test_the_claims.py` quotes each promise
+that `README.md` makes and tests the code against it, and it fails if one of
+those sentences is reworded without the test moving too. `tests/test_properties.py` generates names rather
 than naming cases, and it states the three claims a person relies on when they
 accept a mapping. No group holds two digit signatures, `apply` keeps every row
 and never touches the source column, and the result never depends on the order
