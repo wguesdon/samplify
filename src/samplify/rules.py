@@ -18,8 +18,15 @@ CANONICAL_DELIMITER = "_"
 #: Characters treated as delimiters when a name is split into tokens.
 DELIMITER_PATTERN = r"[_\-.\s]"
 
-#: Characters allowed in a canonical name. Anything else is dropped.
+#: Characters a fully canonical name may hold. :func:`is_canonical` reports
+#: against this set.
 CANONICAL_CHARSET = re.compile(r"[^a-z0-9_]")
+
+#: Characters that normalisation drops. A letter or a digit in any script
+#: survives, because it can carry the identity of the sample. A cohort that
+#: writes its replicates as ``sample_9α`` and ``sample_9β`` names two samples,
+#: and an ASCII-only set deletes both suffixes and merges the pair.
+NON_IDENTIFIER = re.compile(r"[^\w]")
 
 
 @dataclass(frozen=True)

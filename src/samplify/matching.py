@@ -37,10 +37,13 @@ DEFAULT_DISTANCE = "damerau"
 
 _DIGIT_RUN = re.compile(r"\d+")
 
-#: A number together with any letters attached to it, as in ``9a`` or ``03b``.
-#: The trailing letter identifies a sample exactly as the number does, because
-#: a cohort labels its replicates ``sample9a`` and ``sample9b``.
-_ID_RUN = re.compile(r"\d+[a-z]*")
+#: The shortest letter skeleton for which one inserted, deleted or swapped
+#: letter counts as a typing error on its own. Below this length the same edit
+#: separates two real terms. ``wt`` and ``wnt`` are wildtype and the Wnt gene
+#: family, ``t`` and ``tp`` are a treatment and a timepoint, and ``k`` and
+#: ``ko`` are a plate letter and a knockout. A short name therefore has to
+#: clear the ratio like any other pair.
+MIN_SLIP_LENGTH = 5
 
 
 # ── String distances ───────────────────────────────────────────────────────
@@ -189,28 +192,59 @@ def similarity(a: str, b: str, method: str = DEFAULT_DISTANCE) -> float:
 def digit_signature(name: str) -> tuple[str, ...]:
     """Extract the identity of a name, which is its sequence of numbers.
 
-    A letter attached to a number is part of the identity and stays. Zero
-    padding is removed, so that ``sample01`` and ``sample1`` share one
-    signature.
+    Zero padding is removed, so that ``sample01`` and ``sample1`` share one
+    signature. A letter run that follows a number is part of the identity only
+    when no digit follows it. The ``a`` of ``sample_9a`` labels a replicate and
+    stays. The ``b`` of ``p1b1`` introduces the next number of the name and
+    goes, so that ``p1b1`` and ``p1_b1`` share one signature.
+
+    A letter in any script counts, because a cohort that labels its replicates
+    ``sample_9α`` and ``sample_9β`` names two samples exactly as ``9a`` and
+    ``9b`` do.
 
     Args:
         name: A raw sample name.
 
     Returns:
         The numbers found in the name, in order, each without leading zeros and
-        each carrying any letters that follow it directly.
+        each carrying the letters that identify it.
 
     Example:
         >>> digit_signature("p111-batch03")
         ('111', '3')
         >>> digit_signature("sample_9a")
         ('9a',)
+        >>> digit_signature("p1b1")
+        ('1', '1')
     """
+    lowered = name.lower()
     signature: list[str] = []
-    for run in _ID_RUN.findall(name.lower()):
-        digits = _DIGIT_RUN.match(run).group()
-        suffix = run[len(digits):]
+    index = 0
+
+    while index < len(lowered):
+        if not lowered[index].isdigit():
+            index += 1
+            continue
+
+        start = index
+        while index < len(lowered) and lowered[index].isdigit():
+            index += 1
+        digits = lowered[start:index]
+
+        letters_start = index
+        while index < len(lowered) and lowered[index].isalpha():
+            index += 1
+        suffix = lowered[letters_start:index]
+
+        # A letter run with a digit behind it belongs to the next component of
+        # the name. Read the letters again from the start of the run, so that
+        # the number behind them opens its own component.
+        if index < len(lowered) and lowered[index].isdigit():
+            suffix = ""
+            index = letters_start
+
         signature.append((digits.lstrip("0") or "0") + suffix)
+
     return tuple(signature)
 
 
@@ -269,7 +303,7 @@ def rule_normalise(name: str) -> str:
             joined_tokens.append(token)
 
     expanded = [piece for piece in (_expand_token(t) for t in joined_tokens) if piece]
-    return rules.CANONICAL_CHARSET.sub("", rules.CANONICAL_DELIMITER.join(expanded))
+    return rules.NON_IDENTIFIER.sub("", rules.CANONICAL_DELIMITER.join(expanded))
 
 
 def _expand_token(token: str) -> str:
@@ -370,6 +404,12 @@ def group_names(
         raise ValueError(
             f"Unknown offline method: {method!r}. Use one of {OFFLINE_METHODS}."
         )
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(
+            f"threshold must be between 0.0 and 1.0. Got {threshold}. "
+            f"A similarity is a ratio, so a value outside that range either "
+            f"merges every name in a block or merges none of them."
+        )
 
     unique = sorted(set(names))
     union = _UnionFind(unique)
@@ -414,7 +454,8 @@ def describe_difference(a: str, b: str) -> str:
         return "identical"
     if digit_signature(a) != digit_signature(b):
         return "different identifiers"
-    if rule_normalise(a) == rule_normalise(b):
+    normalised = rule_normalise(a)
+    if normalised and normalised == rule_normalise(b):
         return "formatting only"
 
     left, right = letter_skeleton(a), letter_skeleton(b)
@@ -431,12 +472,17 @@ def describe_difference(a: str, b: str) -> str:
 def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     """Report whether two names in the same block belong together.
 
-    A single inserted, deleted or swapped letter always matches. Those are the
-    shapes a slipped keystroke makes, and a ratio threshold cannot see them in
-    a short name: ``smple`` against ``sample`` scores 0.833, below any sensible
-    cut, and it is plainly a typo.
+    A single inserted, deleted or swapped letter matches on its own, provided
+    both letter skeletons hold at least :data:`MIN_SLIP_LENGTH` letters. Those
+    are the shapes a slipped keystroke makes, and a ratio threshold cannot see
+    them in a short name: ``smple`` against ``sample`` scores 0.833, below any
+    sensible cut, and it is plainly a typo.
 
-    A single substituted letter does not get that treatment, and must clear the
+    Below that length the same edit tells two real terms apart, so the pair has
+    to clear the ratio like any other. ``wt`` and ``wnt`` differ by one inserted
+    letter and they are wildtype and the Wnt gene family.
+
+    A single substituted letter never gets that treatment, and must clear the
     ratio instead. A substitution is the one edit that also carries meaning.
     Cohorts label replicates ``sample1a`` and ``sample1b``, and those two names
     differ by exactly one substituted letter.
@@ -450,15 +496,32 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     Returns:
         True when the two names should join one group.
     """
-    if rule_normalise(a) == rule_normalise(b):
+    left, right = letter_skeleton(a), letter_skeleton(b)
+
+    # An empty normalised form is not agreement. Two names built only from
+    # characters that the rules drop both normalise to the empty string, and
+    # reading that as a match merges every one of them into one sample.
+    normalised = rule_normalise(a)
+    if normalised and normalised == rule_normalise(b):
         return True
     if method == "rules":
         return False
 
-    if method != "hamming" and describe_difference(a, b) in SLIP_KINDS:
+    # Two names with no letter at all score 1.0 against each other, because the
+    # ratio compares two empty strings. A name of that shape carries no
+    # evidence, so the ratio may not decide it. Two names that differ only in
+    # their numbers already left this function at the blocking step.
+    if not left or not right:
+        return False
+
+    if (
+        method != "hamming"
+        and min(len(left), len(right)) >= MIN_SLIP_LENGTH
+        and describe_difference(a, b) in SLIP_KINDS
+    ):
         return True
 
-    return similarity(letter_skeleton(a), letter_skeleton(b), method=method) >= threshold
+    return similarity(left, right, method=method) >= threshold
 
 
 def find_near_misses(names: list[str]) -> list[tuple[str, str]]:
@@ -636,7 +699,10 @@ def canonical_for_group(
     weights: Counter[str] = Counter()
     for name in group:
         weight = 1 if occurrences is None else max(occurrences.get(name, 1), 1)
-        weights[rule_normalise(name)] += weight
+        # A name built only from characters that the rules drop normalises to
+        # the empty string. Keep the raw name in that condition, because an
+        # empty canonical name renames a sample to nothing.
+        weights[rule_normalise(name) or name] += weight
 
     if len(weights) == 1:
         return next(iter(weights))
