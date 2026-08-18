@@ -15,6 +15,14 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 ## [0.9.5] - 2026-08-18
 
+### Changed
+
+- `llm_bioinformatics_naming_tools.md` is in Simplified Technical English. It
+  was the one tracked document that was not, and the repository is now public.
+  Every one of its 22 links and DOIs is unchanged, and the LinkedIn draft at the
+  end is kept byte for byte, because it is a draft in the voice of the author.
+  The note that samplify fills the gap it describes is new.
+
 ### Fixed
 
 - A group id that is not a number is refused with a `ValueError`. `int(None)`
