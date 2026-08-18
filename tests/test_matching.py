@@ -809,3 +809,16 @@ def test_zero_padding_falls_away_in_any_script():
     assert matching.digit_signature("sample000") == ("0",)
     assert len(matching.group_names(["sample٠١", "sample١"], method="damerau")) == 1
     assert len(matching.group_names(["sample1", "sample١"], method="damerau")) == 2
+
+
+def test_the_rules_backend_removes_padding_in_any_script_too():
+    """The signature and the normalisation call the same padding function.
+
+    `digit_signature` was fixed first and `_expand_token` was not, so the rules
+    backend still kept `s٠١` and `s١` apart while the identity rule had already
+    joined them.
+    """
+    assert matching.rule_normalise("s٠١") == matching.rule_normalise("s١")
+    assert matching.rule_normalise("s01") == matching.rule_normalise("s1") == "sample1"
+    assert matching.rule_normalise("sample000") == "sample0"
+    assert matching.group_names(["s٠١", "s١"], method="rules") == [["s٠١", "s١"]]

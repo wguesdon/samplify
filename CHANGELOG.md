@@ -13,6 +13,18 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.10.5] - 2026-08-18
+
+The twelfth review reported that no finding is major, and it was the second
+pass in a row to say so. Its one finding is below.
+
+### Fixed
+
+- The normalisation removes padding in any script, as the identity signature
+  already did. 0.10.2 fixed `digit_signature` and left `_expand_token`, so the
+  `rules` backend still kept `s٠١` and `s١` apart while the identity rule had
+  already joined them. Every place that removes padding now calls one function.
+
 ## [0.10.4] - 2026-08-18
 
 The eleventh review found one defect and reported that it is not major.

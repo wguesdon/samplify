@@ -393,7 +393,9 @@ def _without_padding(digits: str) -> str:
 
     ``str.lstrip("0")`` removes the ASCII zero and nothing else, so the
     Arabic-Indic ``٠١`` kept its padding while ``01`` lost it. The two spellings
-    of a number then had different identities and never grouped.
+    of a number then had different identities and never grouped. Every place
+    that removes padding calls this one function, in the signature and in the
+    normalisation alike, so the two cannot disagree.
 
     The digits keep their own script. ``sample١`` and ``sample1`` hold the same
     number in two scripts, and they stay apart for the same reason that
@@ -515,18 +517,18 @@ def _expand_token(token: str) -> str:
         number = _DIGIT_RUN.search(token)
         if number is None:
             return abbreviation.canonical
-        return f"{abbreviation.canonical}{number.group().lstrip('0') or '0'}"
+        return f"{abbreviation.canonical}{_without_padding(number.group())}"
 
     # Not an abbreviation. Strip zero-padding from a bare number so that
     # sample_01 and sample_1 agree.
     if token.isdecimal():
-        return token.lstrip("0") or "0"
+        return _without_padding(token)
 
     # A word followed by a number, such as "sample007".
     split = re.fullmatch(r"([a-z]+)(\d+)", token)
     if split is not None:
         word, number = split.groups()
-        return f"{word}{number.lstrip('0') or '0'}"
+        return f"{word}{_without_padding(number)}"
 
     return token
 
