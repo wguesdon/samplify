@@ -140,3 +140,28 @@ def test_a_different_file_is_not_the_same_file(workspace):
 
     assert not is_the_same_file(workspace["root"] / "other.csv", workspace["data"])
     assert not is_the_same_file(workspace["mapping"], workspace["data"])
+
+
+def test_a_directory_alias_of_the_input_is_the_input(tmp_path, capsys):
+    """The alias can be the parent rather than the file."""
+    from samplify.csv_processor import propose_csv
+
+    real = tmp_path / "real"
+    real.mkdir()
+    data = real / "data.csv"
+    data.write_text("sample_id\nS1_B1\ns1-b1\n")
+
+    mapping = real / "mapping.json"
+    result = propose_csv(data, "sample_id", method="damerau")
+    result.accept_all()
+    mapping_module.write(result, mapping)
+
+    linked = tmp_path / "linked"
+    linked.symlink_to(real)
+
+    before = data.read_bytes()
+    code = cli.main(["apply", str(mapping), "--output", str(linked / "data.csv")])
+
+    assert code == 1
+    assert "no output over" in " ".join(capsys.readouterr().out.split())
+    assert data.read_bytes() == before
