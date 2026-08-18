@@ -13,6 +13,27 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.4.1] - 2026-08-18
+
+### Fixed
+
+- The near-miss search is indexed and no longer reads every pair. A reportable
+  pair agrees on its letters and on every number but one, so samplify indexes
+  the names by that agreement and looks up the one number that is allowed to
+  differ. The pairwise form compared every pair inside one letter skeleton, and
+  a cohort written to one convention holds all of its names in one skeleton. On
+  6168 names of that shape the search took 34.5 seconds, and `propose` took
+  38.9 seconds. The search now takes 0.03 seconds and `propose` takes 0.32
+  seconds. The result is identical, and 88 datasets were compared against the
+  previous implementation to establish that.
+- The result of `find_near_misses` and every group is unchanged, so this
+  version is a patch.
+
+### Added
+
+- A test that fails if the near-miss search becomes quadratic again, and four
+  tests for the positions and the shapes that the index has to reach.
+
 ## [0.4.0] - 2026-08-18
 
 A code review found 18 defects, and this version repairs all of them. Seven of

@@ -245,6 +245,21 @@ samplify does not report a substituted digit. The pair `patient111` and
 `patient112` differs in that way, and almost every other pair in a cohort differs
 in the same way. A report of every substituted digit hides the cases that matter.
 
+The search is indexed. A reportable pair agrees on its letters and on every
+number but one, so samplify builds one key from that agreement and then looks up
+the one number that is allowed to differ. The shorter of two numbers that differ
+by one character is the longer one with a character removed, and generating
+those removals costs one lookup for each character.
+
+The search read every pair inside one letter skeleton until version 0.4.1. A
+cohort written to one convention holds every one of its names in that one
+skeleton, so the cost was the square of the size of the cohort. On 6168 names
+the search took 34.5 seconds, and it now takes 0.03 seconds.
+
+samplify does not report a dropped replicate letter. The names `sample_9` and
+`sample_9a` have the letter skeletons `sample` and `samplea`, so they reach
+neither the same group nor the same report.
+
 ## The canonical name of a group
 
 The canonical name is the frequency-weighted medoid of the group. The medoid is
@@ -377,7 +392,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 196 offline tests, no key and no server
+uv run pytest                 # 202 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

@@ -365,3 +365,73 @@ def test_group_names_refuses_a_threshold_outside_the_ratio():
 def test_the_canonical_name_of_an_unnormalisable_group_is_the_raw_name():
     """An empty canonical name would rename the sample to nothing."""
     assert matching.canonical_for_group(["###"]) == "###"
+
+
+# ── The indexed near-miss search ───────────────────────────────────────────
+
+
+def test_near_miss_reads_the_middle_component_of_a_signature():
+    """The index keys on every other component, so any position must work.
+
+    The pair is sorted, and the underscore sorts after every digit, so the
+    longer number comes first.
+    """
+    names = ["donor2_plate11_well3", "donor2_plate111_well3"]
+    assert matching.find_near_misses(names) == [
+        ("donor2_plate111_well3", "donor2_plate11_well3")
+    ]
+
+
+def test_near_miss_needs_every_other_component_to_agree():
+    names = ["donor2_plate11_well3", "donor9_plate111_well3"]
+    assert matching.find_near_misses(names) == []
+
+
+def test_near_miss_pairs_every_spelling_of_the_two_names():
+    """Several spellings of one sample all reach the report."""
+    names = ["patient11_batch1", "PATIENT11-BATCH1", "patient111_batch1"]
+    assert matching.find_near_misses(names) == [
+        ("PATIENT11-BATCH1", "patient111_batch1"),
+        ("patient111_batch1", "patient11_batch1"),
+    ]
+
+
+def test_a_dropped_replicate_letter_is_not_a_near_miss():
+    """The letter belongs to the skeleton, so the two names never meet.
+
+    `sample_9` and `sample_9a` have the skeletons `sample` and `samplea`. The
+    identity rule keeps them apart, which is correct, and the near-miss search
+    groups by skeleton, so it never sees the pair. A dropped replicate letter
+    therefore reaches no report. This test records the behaviour and not an
+    approval of it.
+    """
+    assert matching.find_near_misses(["sample_9", "sample_9a"]) == []
+
+
+def test_near_miss_stays_fast_on_a_cohort_of_one_convention():
+    """A cohort written to one convention holds every name in one skeleton.
+
+    The pairwise search read 19 million pairs there and took 34 seconds. The
+    bound below is far above the indexed cost and far below the pairwise one,
+    so it fails only if the search becomes quadratic again.
+    """
+    import time
+
+    names = [f"patient{i}_batch{(i % 12) + 1}" for i in range(1, 6001)]
+    start = time.perf_counter()
+    pairs = matching.find_near_misses(names)
+    elapsed = time.perf_counter() - start
+
+    assert elapsed < 5.0, f"the near-miss search took {elapsed:.1f} s"
+    # Every number from 1 to 6000 has a neighbour in the series, so each one is
+    # an ordinary member of it and the report stays empty.
+    assert pairs == []
+
+
+def test_near_miss_fires_at_scale_where_the_series_has_a_gap():
+    """The same cohort with one number far outside the series reports it."""
+    names = [f"patient{i}_batch1" for i in range(1, 3001)]
+    names.append("patient29999_batch1")
+    names.append("patient2999_batch1")
+
+    assert ("patient29999_batch1", "patient2999_batch1") in matching.find_near_misses(names)

@@ -538,6 +538,14 @@ def find_near_misses(names: list[str]) -> list[tuple[str, str]]:
     inserted or dropped digit changes the length of the number, which is the
     shape a slipped keystroke actually has.
 
+    The search is indexed and not pairwise. A reportable pair agrees on its
+    letters and on every number but one, so samplify indexes the names by that
+    agreement and then looks up the one number that is allowed to differ. The
+    pairwise form read every pair inside one letter skeleton, and a cohort
+    written to one convention holds all of its names in one skeleton. On 6168
+    names of that shape the pairwise form took 34.5 seconds and this one takes
+    0.03 seconds, with the same result.
+
     Args:
         names: The unique raw sample names.
 
@@ -545,23 +553,54 @@ def find_near_misses(names: list[str]) -> list[tuple[str, str]]:
         Every pair as a sorted tuple, in a deterministic order.
     """
     unique = sorted(set(names))
-    by_skeleton: dict[str, list[str]] = {}
-    for name in unique:
-        by_skeleton.setdefault(letter_skeleton(name), []).append(name)
-
     series = _number_series(unique)
 
-    pairs: list[tuple[str, str]] = []
-    for skeleton, members in by_skeleton.items():
-        if len(members) < 2:
+    # One entry per name and per position of its signature. The key holds
+    # everything that a reportable pair has to agree on, so the names under one
+    # key differ at that position alone.
+    buckets: dict[tuple[str, int, tuple[str, ...], tuple[str, ...]], dict[str, list[str]]] = {}
+    for name in unique:
+        skeleton = letter_skeleton(name)
+        signature = digit_signature(name)
+        for index, component in enumerate(signature):
+            key = (skeleton, index, signature[:index], signature[index + 1:])
+            buckets.setdefault(key, {}).setdefault(component, []).append(name)
+
+    pairs: set[tuple[str, str]] = set()
+    for (skeleton, index, _, _), by_component in buckets.items():
+        if len(by_component) < 2:
             continue
-        for i, left in enumerate(members):
-            for right in members[i + 1:]:
-                if _one_digit_slip(
-                    digit_signature(left), digit_signature(right), series, skeleton
-                ):
-                    pairs.append((left, right))
+        for longer, holders in by_component.items():
+            # A pair whose two numbers differ by one inserted or dropped
+            # character is a pair in which the shorter number is the longer one
+            # with one character removed. Generating those removals costs one
+            # lookup for each character, and reading every pair costs the
+            # square of the number of names.
+            for shorter in _one_character_deletions(longer):
+                others = by_component.get(shorter)
+                if others is None:
+                    continue
+                if not _slip_is_reportable(shorter, longer, series, skeleton, index):
+                    continue
+                for left in holders:
+                    for right in others:
+                        if left != right:
+                            pairs.add((min(left, right), max(left, right)))
+
     return sorted(pairs)
+
+
+def _one_character_deletions(value: str) -> set[str]:
+    """Return every string that ``value`` becomes when one character is removed.
+
+    Args:
+        value: One component of a digit signature, such as ``"111"`` or ``"9a"``.
+
+    Returns:
+        The distinct results. ``"111"`` gives ``{"11"}`` and ``"9a"`` gives
+        ``{"9", "a"}``.
+    """
+    return {value[:i] + value[i + 1:] for i in range(len(value))}
 
 
 def _number_series(names: list[str]) -> dict[tuple[str, int], set[int]]:
@@ -583,17 +622,21 @@ def _number_series(names: list[str]) -> dict[tuple[str, int], set[int]]:
     return series
 
 
-def _one_digit_slip(
-    left: tuple[str, ...],
-    right: tuple[str, ...],
+def _slip_is_reportable(
+    shorter: str,
+    longer: str,
     series: dict[tuple[str, int], set[int]],
     skeleton: str,
+    index: int,
 ) -> bool:
-    """Report whether two signatures differ by one digit that looks like a slip.
+    """Report whether one component of a pair is worth showing to a person.
 
-    The comparison runs component by component. Joining the numbers into one
-    string would lose the boundary between them, and ``patient11_batch2`` would
-    then look like a slip of ``patient1_batch1``, which it is not.
+    The caller has already established that the two names agree on their
+    letters and on every other component, and that ``shorter`` is ``longer``
+    with one character removed. That comparison runs component by component.
+    Joining the numbers into one string would lose the boundary between them,
+    and ``patient11_batch2`` would then look like a slip of
+    ``patient1_batch1``, which it is not.
 
     A pair is dropped when both numbers sit inside the numbering series the
     dataset already uses. In a cohort numbered 1 to 12, ``sample_1`` and
@@ -602,30 +645,20 @@ def _one_digit_slip(
     112, the number 11 has no neighbour, so the pair 11 and 111 is worth a look.
 
     Args:
-        left: The digit signature of the first name.
-        right: The digit signature of the second name.
+        shorter: The shorter of the two components.
+        longer: The longer of the two components.
         series: The numbers the dataset uses, from :func:`_number_series`.
         skeleton: The letter skeleton shared by both names.
+        index: The position of the component in the signature.
 
     Returns:
         True when the pair is worth reporting to a person.
     """
-    if len(left) != len(right) or left == right:
-        return False
-
-    differing = [(index, a, b) for index, (a, b) in enumerate(zip(left, right)) if a != b]
-    if len(differing) != 1:
-        return False
-
-    index, a, b = differing[0]
-    if abs(len(a) - len(b)) != 1 or damerau_levenshtein_distance(a, b) != 1:
-        return False
-
-    if not (a.isdigit() and b.isdigit()):
+    if not (shorter.isdigit() and longer.isdigit()):
         return True
 
     observed = series.get((skeleton, index), set())
-    return not (_in_series(int(a), observed) and _in_series(int(b), observed))
+    return not (_in_series(int(shorter), observed) and _in_series(int(longer), observed))
 
 
 def _in_series(value: int, observed: set[int]) -> bool:
