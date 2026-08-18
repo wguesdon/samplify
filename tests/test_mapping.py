@@ -557,3 +557,33 @@ def test_apply_refuses_a_mapping_whose_input_file_is_not_text(tmp_path, capsys):
     path.write_text('{"schema_version":1,"groups":[],"input_file":1,"column":"sample_id"}')
     assert cli.main(["apply", str(path)]) == 1
     assert "must be text" in " ".join(capsys.readouterr().out.split())
+
+
+def test_no_shape_of_any_field_answers_with_the_wrong_error():
+    """One sweep over every field of a mapping file and every wrong shape.
+
+    Reviews reported one field at a time for four passes. This asserts the
+    whole surface at once: a malformed value answers with ValueError and never
+    with a TypeError, an AttributeError or anything else.
+    """
+    group = {"id": 1, "members": ["s_1"], "proposed": "s1", "final": "s1",
+             "status": STATUS_ACCEPTED}
+    base = {"schema_version": 1, "groups": [group]}
+    shapes = [None, True, False, 0, 1, -1, 3.5, "", "text", [], {}, [[]], [None],
+              {"a": None}]
+    fields = ("schema_version", "groups", "reviewed", "method", "model", "provider",
+              "base_url", "input_file", "column", "near_misses", "diagnosis",
+              "canonical_pattern", "created", "reviewed_at")
+
+    for field in fields:
+        for shape in shapes:
+            document = dict(base)
+            document[field] = shape
+            try:
+                MappingFile.from_dict(document)
+            except ValueError:
+                pass
+            except Exception as exc:  # noqa: BLE001 - the point of the test
+                raise AssertionError(
+                    f"{field}={shape!r} raised {type(exc).__name__}: {exc}"
+                ) from exc
