@@ -726,6 +726,23 @@ def apply_mapping(
         "changes": changes,
     }
 
+    # Every destination is checked before the first one is written. Without
+    # this the output CSV was written and then a log with a bad path failed, so
+    # the command reported an error while one of its files was already on disk.
+    for label, destination in (
+        ("--output", output_path),
+        ("--json-log", json_log_path),
+        ("--csv-log", csv_log_path),
+    ):
+        if destination is None:
+            continue
+        parent = Path(destination).parent
+        if not parent.is_dir():
+            raise ValueError(
+                f"{label} points into {parent}, which is not a directory that "
+                f"exists. samplify writes all of its files or none of them."
+            )
+
     if output_path is not None:
         df.to_csv(output_path, index=False)
     if json_log_path is not None:

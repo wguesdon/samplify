@@ -951,3 +951,43 @@ def test_an_ordinary_missing_column_still_lists_the_columns(tmp_path):
 
     with pytest.raises(ValueError, match="Available: \\['sample_id', 'value'\\]"):
         propose_csv(source, "absent", method="damerau")
+
+
+@pytest.mark.parametrize("option", ["output_path", "json_log_path", "csv_log_path"])
+def test_apply_writes_all_of_its_files_or_none_of_them(tmp_path, option):
+    """A destination that cannot be written is found before the first write.
+
+    The output CSV was written and then a log with a bad path failed, so the
+    command reported an error while one of its files was already on disk.
+    """
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    mapping = _accepted(source)
+
+    destinations = {
+        "output_path": tmp_path / "clean.csv",
+        "json_log_path": tmp_path / "log.json",
+        "csv_log_path": tmp_path / "changes.csv",
+    }
+    destinations[option] = tmp_path / "absent" / "file"
+
+    with pytest.raises(ValueError, match="all of its files or none"):
+        apply_mapping(mapping, **destinations)
+
+    for path in destinations.values():
+        assert not path.exists(), path
+
+
+def test_apply_writes_all_three_when_every_path_is_good(tmp_path):
+    source = tmp_path / "data.csv"
+    source.write_text("sample_id\nS1_B1\ns1-b1\n")
+    mapping = _accepted(source)
+
+    paths = {
+        "output_path": tmp_path / "clean.csv",
+        "json_log_path": tmp_path / "log.json",
+        "csv_log_path": tmp_path / "changes.csv",
+    }
+    apply_mapping(mapping, **paths)
+    for path in paths.values():
+        assert path.exists(), path

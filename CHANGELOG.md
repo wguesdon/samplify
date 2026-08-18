@@ -13,6 +13,16 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.12.2] - 2026-08-19
+
+### Fixed
+
+- `apply` writes all of its files or none of them. Each destination is checked
+  before the first one is written. The output CSV was written and then a log
+  with a bad path failed, so the command reported an error and exited with the
+  status 1 while one of its files was already on disk. An exit code of 1 now
+  means that nothing was written.
+
 ## [0.12.1] - 2026-08-19
 
 ### Fixed
