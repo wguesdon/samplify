@@ -1255,3 +1255,20 @@ def test_a_label_added_at_either_end_is_not_a_slipped_keystroke(left, right):
 def test_a_slip_inside_the_name_still_merges(left, right):
     """The rule reads the end of the name and nothing else."""
     assert matching.group_names([left, right], method="damerau") == [sorted([left, right])]
+
+
+def test_a_chain_carries_evidence_that_the_names_are_one_sample():
+    """The design note and the code agree about a chain, and this pins both.
+
+    `patient1_batch1`, `patietn1_batch1` and `pateint1_batch1` are the same
+    name typed by two people who slipped in different places. Each wrong
+    spelling is one edit from the right one, the two of them are two edits from
+    each other, and the middle name is the evidence that the three are one
+    sample.
+    """
+    names = ["patient1_batch1", "patietn1_batch1", "pateint1_batch1"]
+    assert matching.group_names(names, method="damerau") == [sorted(names)]
+
+    ends = ["patietn1_batch1", "pateint1_batch1"]
+    assert matching.damerau_levenshtein_distance(*matching.comparable_letters(*ends)) == 2
+    assert len(matching.group_names(ends, method="damerau")) == 2

@@ -391,9 +391,24 @@ written `Mock_TGW`, which are two cell lines five edits and a ratio of 0.889
 apart. Both real typing errors in that corpus were one edit apart. The cap
 removed 246 of the 350 merges that samplify proposed there.
 
-The cap costs a name that holds two typing errors, which stays in its own
-group. A person then reads two samples where there is one. That is the failure
-this tool prefers, because a wrong merge drops a row and reports nothing.
+The cap governs one pair. A name that holds two typing errors and stands alone
+therefore stays in its own group, and a person reads two samples where there is
+one. That is the failure this tool prefers, because a wrong merge drops a row
+and reports nothing.
+
+A group is built from many pairs, and grouping is transitive, so a group may
+still hold two names that are two edits apart. This is a decision and not an
+accident. `patient1_batch1`, `patietn1_batch1` and `pateint1_batch1` are the
+same name typed by two people who slipped in different places. Each of the two
+wrong spellings is one edit from the right one, and the two of them are two
+edits from each other. The middle name is the evidence that the three are one
+sample, and splitting the group would report three samples where there is one.
+
+A substitution carries the opposite evidence, so `split_on_a_substitution` runs
+over every finished group and falls back to one group per letter skeleton when
+it finds one. The reference corpus holds no group in which a pair joined by a
+distance sits above the cap, so nothing measured depends on the chain either
+way.
 
 The cap also decides the cost of the search. A distance that may not exceed one
 edit needs three diagonals of the grid and not the whole grid, so one
