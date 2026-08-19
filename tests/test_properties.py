@@ -298,3 +298,40 @@ def test_no_group_joins_two_names_where_one_gained_a_token(names, method):
                 if matching.rule_normalise(left) == matching.rule_normalise(right):
                     continue
                 assert not matching._one_name_gained_a_token(left, right), (left, right)
+
+
+# ── The row count of the output is the row count of the file ───────────────
+
+_lines = st.one_of(
+    sample_names(),
+    st.just(""),
+    st.just("   "),
+    st.just('"a,b"'),
+    st.just('"has ""quotes"""'),
+)
+
+
+@given(lines=st.lists(_lines, min_size=1, max_size=12))
+@settings(max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+def test_the_output_holds_one_row_for_each_record_of_the_file(lines):
+    """The csv module is the ground truth for how many rows a file holds.
+
+    A blank line is a record and pandas dropped it, so the output held fewer
+    rows than the input. The count is read from the file rather than from the
+    list of names, because a quoted newline makes one record of two lines.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "in.csv"
+        source.write_text("sample_id\n" + "\n".join(lines) + "\n", newline="")
+
+        with open(source, newline="") as handle:
+            records = list(csv_module.reader(handle))
+        expected = len(records) - 1
+
+        mapping = propose_csv(source, "sample_id", method="damerau")
+        mapping.accept_all()
+        output = Path(directory) / "out.csv"
+        frame, log = apply_mapping(mapping, output_path=output)
+
+        assert len(frame) == expected, (lines, len(frame), expected)
+        assert log["summary"]["total_rows"] == expected

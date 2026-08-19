@@ -85,13 +85,23 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
     # skip_blank_lines is False, because the default drops an empty line and
     # that line is a row of the file. The output then held fewer rows than the
     # input, which is the one thing this tool must never do.
-    df = pd.read_csv(
-        path,
-        dtype=str,
-        keep_default_na=False,
-        na_filter=False,
-        skip_blank_lines=False,
-    )
+    try:
+        df = pd.read_csv(
+            path,
+            dtype=str,
+            keep_default_na=False,
+            na_filter=False,
+            skip_blank_lines=False,
+        )
+    except pd.errors.ParserError as exc:
+        # The reader raises on a file it cannot parse, and its message names no
+        # file. An opening quote with no closing one is the usual cause, and it
+        # swallows every line after it, so the count of rows is already wrong.
+        raise ValueError(
+            f"{path} is not a CSV that can be read. The reader said: {exc}. "
+            f"A quote that is opened and never closed is the usual cause, "
+            f"because it makes one row of every line after it."
+        ) from exc
     if column not in df.columns:
         # A tab separated file reads as one column whose name holds every
         # heading. The list of available columns then shows one entry that

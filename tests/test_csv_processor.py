@@ -991,3 +991,16 @@ def test_apply_writes_all_three_when_every_path_is_good(tmp_path):
     apply_mapping(mapping, **paths)
     for path in paths.values():
         assert path.exists(), path
+
+
+def test_a_file_that_cannot_be_parsed_names_itself_and_the_cause(tmp_path):
+    """A quote that is never closed gave a pandas traceback and no file name."""
+    source = tmp_path / "broken.csv"
+    source.write_text('sample_id,n\n"unclosed,1\nsample_2,2\n')
+
+    with pytest.raises(ValueError) as error:
+        propose_csv(source, "sample_id", method="damerau")
+
+    message = str(error.value)
+    assert "broken.csv" in message
+    assert "quote" in message
