@@ -191,6 +191,14 @@ def _read_csv(path: Path, column: str, encoding: str = DEFAULT_ENCODING) -> pd.D
             _refuse_a_row_that_cannot_be_read(path, header, reader)
     except UnicodeDecodeError as exc:
         raise ValueError(_the_encoding_is_wrong(path, encoding, exc)) from exc
+    except csv.Error as exc:
+        # Python 3.10 and 3.11 raise here on a NUL byte and later versions
+        # keep the byte and return it, so the check below never ran on those
+        # two and this message never appeared.
+        raise ValueError(
+            f"{path} cannot be read as a CSV: {exc}. A NUL byte is the usual "
+            f"cause, and it means the file is binary or damaged."
+        ) from exc
     if header.count(column) > 1:
         raise ValueError(
             f"Column {column!r} appears {header.count(column)} times in {path}. "

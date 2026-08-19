@@ -19,6 +19,10 @@ The tenth review with no list of past findings reports one major item.
 
 ### Fixed
 
+- A NUL byte in the header is refused on every supported interpreter. Python
+  3.10 and 3.11 raise inside the `csv` module and later versions keep the byte,
+  so the check ran on the later ones only and the file failed with a traceback
+  on the others.
 - A label added at either end of a name is not a slipped keystroke. `sample_A`
   and `sample_AA` are two identifiers and the ratio refuses them, because the
   differing token is short. Written compactly as `SampleA` and `SampleAA` the

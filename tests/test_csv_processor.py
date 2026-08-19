@@ -1223,10 +1223,21 @@ def test_nothing_is_reported_when_the_data_holds_no_such_name(tmp_path):
     assert log["joined_without_a_decision"] == []
 
 
-def test_a_nul_byte_in_the_header_is_refused(tmp_path):
-    """A NUL cuts a column name short, and the column asked for is not that one."""
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"sample_id\x00hidden,other\ns1,kept\n",   # the NUL is in the header
+        b"sample_id,meta\ns1,a\x00b\n",            # the NUL is in a row
+    ],
+)
+def test_a_nul_byte_is_refused_and_the_message_names_it(tmp_path, content):
+    """A NUL cuts a value short, and the column asked for is not that one.
+
+    Python 3.10 and 3.11 raise inside the csv module and later versions keep
+    the byte, so both paths lead to the same message.
+    """
     source = tmp_path / "binary.csv"
-    source.write_bytes(b"sample_id\x00hidden,other\ns1,kept\n")
+    source.write_bytes(content)
 
     with pytest.raises(ValueError, match="NUL"):
         propose_csv(source, "sample_id", method="damerau")
