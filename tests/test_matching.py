@@ -1167,3 +1167,26 @@ def test_the_set_of_signs_covers_every_identity_character_of_the_corpus():
         assert matching.rule_normalise(f"cd4{character}_donor1") == matching.rule_normalise(
             "cd4_donor1"
         ), character
+
+
+def test_every_unicode_spelling_of_a_kept_sign_reads_as_that_sign():
+    """The list of spellings is closed, and this test is how it stays closed.
+
+    A character whose compatibility form is a sign samplify keeps is a spelling
+    of that sign. `CD4⁺` merged with `CD4⁻` because one such spelling was
+    missing, and that pair is a positive and a negative population.
+    """
+    import unicodedata
+
+    known = set(rules.IDENTITY_SIGNS) | set(rules.HYPHENS)
+    missing = []
+    for code in range(0x20, 0x1F000):
+        character = chr(code)
+        forms = {
+            unicodedata.normalize("NFKC", character),
+            unicodedata.normalize("NFKD", character),
+        }
+        if forms & {"+", "-", "'", "±"} and character not in known:
+            missing.append(f"U+{code:04X} {unicodedata.name(character, '?')}")
+
+    assert missing == [], missing

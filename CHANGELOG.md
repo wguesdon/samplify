@@ -25,6 +25,9 @@ is the case this tool exists for.
   character, so normalisation deleted it and the identity signature never saw
   it. A journal writes a population that way. The superscript and the subscript
   forms of the plus and the minus now read as the ASCII ones.
+- Every Unicode spelling of a sign samplify keeps is now in the tables. A
+  character whose compatibility form is `+`, `-`, `'` or `±` is a spelling of
+  that sign, and a test walks the whole range so the list stays closed.
 - The minus-or-plus sign joins the signs. It is the plus-minus sign written the
   other way round, and that one was already there.
 - An empty name is not canonical. The search for a forbidden character finds

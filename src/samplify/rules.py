@@ -40,6 +40,9 @@ IDENTITY_SIGNS = (
     "\uff0b"  # FULLWIDTH PLUS SIGN
     "\u207a"  # SUPERSCRIPT PLUS SIGN, which is how a journal writes CD4+
     "\u208a"  # SUBSCRIPT PLUS SIGN
+    "\ufe62"  # SMALL PLUS SIGN
+    "\ufb29"  # HEBREW LETTER ALTERNATIVE PLUS SIGN
+    "\uff07"  # FULLWIDTH APOSTROPHE
 )
 
 #: Every character a keyboard, a word processor or a journal uses for a hyphen
@@ -57,6 +60,7 @@ HYPHENS = (
     "\uff0d"  # FULLWIDTH HYPHEN-MINUS
     "\u207b"  # SUPERSCRIPT MINUS, which is how a journal writes CD4-
     "\u208b"  # SUBSCRIPT MINUS
+    "\ufe63"  # SMALL HYPHEN-MINUS
 )
 
 #: Every spelling of one sign folds to one character before any reader sees the
@@ -72,6 +76,9 @@ _SIGN_FOLD = str.maketrans(
         "\uff0b": "+",  # FULLWIDTH PLUS SIGN
         "\u207a": "+",  # SUPERSCRIPT PLUS SIGN
         "\u208a": "+",  # SUBSCRIPT PLUS SIGN
+        "\ufe62": "+",  # SMALL PLUS SIGN
+        "\ufb29": "+",  # HEBREW LETTER ALTERNATIVE PLUS SIGN
+        "\uff07": "'",  # FULLWIDTH APOSTROPHE
         "\u2032": "'",  # PRIME
         "\u2019": "'",  # RIGHT SINGLE QUOTATION MARK
     }
