@@ -681,8 +681,14 @@ reason.
 
 ## The quality control figure
 
-The `samplify plot` command draws four panels from a mapping file. samplify
-orders the similarity matrix by group, so a block on the diagonal is one sample.
+The `samplify plot` command draws four panels from a mapping file. The title
+names the file the mapping was built from, then the column and the method. It
+held the column and the method only, and a column is normally called `sample_id`
+in every file of a study, so two figures of two files carried the same title and
+read as one figure printed twice.
+
+samplify orders the similarity matrix by group, so a block on the diagonal is
+one sample.
 The other three panels give the spellings per sample and the counts before and
 after the change. The last panel also lists the names that need a decision and
 the reason for each name.

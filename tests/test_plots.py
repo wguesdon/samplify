@@ -13,12 +13,13 @@ import pytest
 
 from samplify import cli
 from samplify import matching
-from samplify.csv_processor import propose_csv
+from samplify.csv_processor import propose, propose_csv
 from samplify.mapping import MappingFile
 
 matplotlib = pytest.importorskip("matplotlib", reason="plotting is an optional extra")
 
-from samplify.plots import qc_figure  # noqa: E402  (after the optional import check)
+from samplify import plots  # noqa: E402  (after the optional import check)
+from samplify.plots import qc_figure  # noqa: E402
 
 EXAMPLE_DIR = Path(__file__).resolve().parent.parent / "example"
 
@@ -185,3 +186,44 @@ def test_the_panel_shows_the_value_that_decided_the_pair():
     assert len(matching.group_names(
         ["patient1_batch1", "patietn1_batch1"], method="damerau"
     )) == 1
+
+
+def test_the_default_title_names_the_file(tmp_path):
+    """Two figures of two files read as one figure otherwise.
+
+    A column is normally called `sample_id` in every file of a study, so the
+    title held the same words for every run and two figures of two files could
+    not be told apart.
+    """
+    first = tmp_path / "cohort_a.csv"
+    first.write_text("sample_id\nsample_1\nsample-1\n")
+    second = tmp_path / "cohort_b.csv"
+    second.write_text("sample_id\nsample_2\nsample-2\n")
+
+    titles = []
+    for source in (first, second):
+        mapping = propose_csv(source, "sample_id", method="damerau")
+        titles.append(plots._default_title(mapping))
+
+    assert titles[0] != titles[1]
+    assert "cohort_a.csv" in titles[0]
+    assert "cohort_b.csv" in titles[1]
+    assert "column sample_id" in titles[0]
+    assert "method damerau" in titles[0]
+
+
+def test_the_default_title_works_without_a_file():
+    """`propose` on a list of names records no file, and the figure still draws."""
+    mapping = propose(["sample_1", "sample-1"], method="damerau")
+
+    title = plots._default_title(mapping)
+    assert title == "samplify quality control: sample names, method damerau"
+
+
+def test_a_title_the_caller_gives_is_the_title(tmp_path):
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n")
+    mapping = propose_csv(source, "sample_id", method="damerau")
+
+    figure = plots.qc_figure(mapping, title="My own title")
+    assert figure._suptitle.get_text() == "My own title"

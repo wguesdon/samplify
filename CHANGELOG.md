@@ -13,6 +13,17 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.20.0] - 2026-08-19
+
+### Changed
+
+- The title of a figure names the file it was drawn from. It held the column
+  and the method only, and a column is normally called `sample_id` in every file
+  of a study, so two figures of two files carried the same title and read as one
+  figure printed twice. The two quality control figures of `README.md` show that.
+  A title that a caller gives is still the title, and a mapping built from a list
+  of names rather than a file still reads `sample names`.
+
 ## [0.19.0] - 2026-08-19
 
 The tenth review with no list of past findings reports one major item. The four

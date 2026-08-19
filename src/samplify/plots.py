@@ -165,6 +165,31 @@ def _decided_by(left: str, right: str) -> float:
     return matching.similarity(first, second, method=matching.DEFAULT_DISTANCE)
 
 
+def _default_title(mapping: MappingFile) -> str:
+    """Build the title of a figure that no caller named.
+
+    The title held the column and the method only. A person who draws a figure
+    for two files reads one title on both, because a column is normally called
+    `sample_id` in every file of a study, and two figures then look like one
+    figure printed twice. The file is what tells two runs apart, so it comes
+    first and only its name is used, because a full path does not fit.
+
+    Args:
+        mapping: The mapping the figure draws.
+
+    Returns:
+        The title.
+    """
+    from pathlib import Path
+
+    parts = []
+    if mapping.input_file:
+        parts.append(Path(mapping.input_file).name)
+    parts.append(f"column {mapping.column}" if mapping.column else "sample names")
+    parts.append(f"method {mapping.method}")
+    return "samplify quality control: " + ", ".join(parts)
+
+
 def _panel_heatmap(ax: Any, mapping: MappingFile) -> None:
     """Draw the similarity matrix with one outlined block per group."""
     from matplotlib.patches import Rectangle
@@ -363,8 +388,7 @@ def qc_figure(
     _panel_flags(figure.add_subplot(grid[2, 1]), mapping)
 
     if title is None:
-        source = mapping.column or "sample names"
-        title = f"samplify quality control: {source}, method {mapping.method}"
+        title = _default_title(mapping)
     figure.suptitle(title, fontsize=14, color=_COLOURS["text"], y=0.98)
 
     if path is not None:
