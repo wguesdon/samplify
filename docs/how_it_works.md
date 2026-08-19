@@ -291,6 +291,12 @@ and the identity signature never saw it. The two names became one string and the
 rules path merged them with no distance computed at all. Version 0.18.0 reads
 the superscript and the subscript forms as the ASCII ones.
 
+A fullwidth character is the same character typed on another keyboard. The
+block from U+FF01 to U+FF5E holds one fullwidth form for each printable ASCII
+character, and `sample１` is `sample1` typed in Japan. A digit of another script
+does not fold, because `sample١` and `sample1` are two scripts and not two
+widths, exactly as `sample_9α` and `sample_9a` are.
+
 The number sign is deliberately not a sign. In `#111_b2` it reads as the word
 number and it identifies nothing. The asterisk is absent for the same reason,
 because it marks a footnote more often than a sample.

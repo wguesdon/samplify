@@ -1190,3 +1190,28 @@ def test_every_unicode_spelling_of_a_kept_sign_reads_as_that_sign():
             missing.append(f"U+{code:04X} {unicodedata.name(character, '?')}")
 
     assert missing == [], missing
+
+
+@pytest.mark.parametrize(
+    "wide,plain",
+    [("sample１", "sample1"), ("sampleＡ_1", "sampleA_1"), ("ｓ１＿ｂ１", "s1_b1")],
+)
+def test_a_fullwidth_character_is_the_same_character(wide, plain):
+    """`sample１` is `sample1` typed on a Japanese keyboard.
+
+    The fullwidth signs were folded and the letters and the digits were not, so
+    one name typed on two keyboards read as two samples.
+    """
+    assert matching.digit_signature(wide) == matching.digit_signature(plain)
+    assert matching.group_names([wide, plain], method="rules") == [sorted([wide, plain])]
+
+
+@pytest.mark.parametrize("pair", [("sample١", "sample1"), ("sample_9α", "sample_9a")])
+def test_another_script_is_another_sample(pair):
+    """A digit of another script is not a width of the ASCII one.
+
+    A cohort that labels its replicates `sample_9α` and `sample_9β` names two
+    samples exactly as `9a` and `9b` do, and the same holds for the digits.
+    """
+    assert matching.digit_signature(pair[0]) != matching.digit_signature(pair[1])
+    assert len(matching.group_names(list(pair), method="rules")) == 2

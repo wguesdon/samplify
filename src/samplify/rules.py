@@ -70,8 +70,18 @@ HYPHENS = (
 #: merged. A sign is a sign in every typeface, and it is now written one way.
 #: The plus-minus sign and the double prime stand for themselves, so neither
 #: folds into another character.
+#: A fullwidth character is the same character typed on another keyboard. The
+#: block from U+FF01 to U+FF5E holds one fullwidth form for each printable
+#: ASCII character, and `sample１` is `sample1` typed in Japan. The signs of that
+#: block were already folded, and the letters and the digits fold for the same
+#: reason. A digit of another script does not fold, because `sample١` and
+#: `sample1` are two scripts and not two widths, exactly as `sample_9α` and
+#: `sample_9a` are.
+_FULLWIDTH = {chr(code): chr(code - 0xFEE0) for code in range(0xFF01, 0xFF5F)}
+
 _SIGN_FOLD = str.maketrans(
     {
+        **_FULLWIDTH,
         **{character: "-" for character in HYPHENS},
         "\uff0b": "+",  # FULLWIDTH PLUS SIGN
         "\u207a": "+",  # SUPERSCRIPT PLUS SIGN

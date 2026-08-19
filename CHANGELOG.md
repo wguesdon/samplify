@@ -25,6 +25,11 @@ is the case this tool exists for.
   character, so normalisation deleted it and the identity signature never saw
   it. A journal writes a population that way. The superscript and the subscript
   forms of the plus and the minus now read as the ASCII ones.
+- A fullwidth letter or digit reads as the ASCII one. The block from U+FF01 to
+  U+FF5E holds one fullwidth form for each printable ASCII character, and
+  `sample１` is `sample1` typed in Japan. The signs of that block were already
+  folded and the letters and the digits were not, so one name typed on two
+  keyboards read as two samples. A digit of another script does not fold.
 - Every Unicode spelling of a sign samplify keeps is now in the tables. A
   character whose compatibility form is `+`, `-`, `'` or `±` is a spelling of
   that sign, and a test walks the whole range so the list stays closed.
