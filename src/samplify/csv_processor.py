@@ -831,6 +831,22 @@ def apply_mapping(
         for original, canonical_name in sorted(final_mapping.items())
     ]
 
+    # A name the mapping never saw can still equal a canonical name the mapping
+    # produces, and the two rows then carry one name although no person put
+    # them in one group. This happens when `apply` runs against a second file,
+    # and it is often correct, because a file already written in the canonical
+    # form is the usual reason. It is reported and not refused for that reason.
+    produced = {
+        canonical_name
+        for original, canonical_name in final_mapping.items()
+        if original != canonical_name
+    }
+    joined_without_a_decision = sorted(
+        name
+        for name in set(df[resolved_column])
+        if name not in final_mapping and name in produced
+    )
+
     names_changed = sum(1 for c in changes if c["changed"])
     summary = mapping.summary()
     summary.update(
@@ -843,11 +859,13 @@ def apply_mapping(
             # input. The counts above describe the mapping, and a mapping name
             # that no row carries counts in them and changes nothing here.
             "rows_changed": int((df[resolved_column] != df[canonical_column]).sum()),
+            "names_joined_without_a_decision": len(joined_without_a_decision),
         }
     )
 
     log: dict[str, Any] = {
         "collisions": {name: ids for name, ids in collisions.items()},
+        "joined_without_a_decision": joined_without_a_decision,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "input_file": str(path.resolve()),
         "mapping_file": mapping_path,

@@ -1144,3 +1144,37 @@ def test_no_file_is_written_when_a_destination_is_a_directory(tmp_path):
         apply_mapping(mapping, output_path=output, json_log_path=tmp_path)
 
     assert not output.exists()
+
+
+def test_a_name_that_already_carries_a_canonical_name_is_reported(tmp_path):
+    """A second file can hold a name that the mapping never saw.
+
+    The mapping renames `sample_1` to `sample1`, and the second file already
+    holds `sample1`. Both rows then read `sample1` although no person put the
+    two names in one group. It is reported and not refused, because a file
+    already written in the canonical form is the usual reason.
+    """
+    source = tmp_path / "first.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n")
+    second = tmp_path / "second.csv"
+    second.write_text("sample_id\nsample_1\nsample1\nother_9\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    frame, log = apply_mapping(mapping, data_path=second)
+
+    assert log["joined_without_a_decision"] == ["sample1"]
+    assert log["summary"]["names_joined_without_a_decision"] == 1
+    assert list(frame["sample_id_canonical"]) == ["sample1", "sample1", "other_9"]
+
+
+def test_nothing_is_reported_when_the_data_holds_no_such_name(tmp_path):
+    """The usual run applies a mapping to the file it was built from."""
+    source = tmp_path / "first.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    _, log = apply_mapping(mapping)
+
+    assert log["joined_without_a_decision"] == []

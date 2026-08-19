@@ -18,6 +18,14 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 The seventh review with no list of past findings reports four major items and
 one medium item. Three of them lose data.
 
+### Added
+
+- `apply` reports a name of the data file that the mapping never saw and that
+  already equals a name the mapping produces. Both rows then read one name
+  although no person put them in one group, which happens when `--data` names a
+  second file. It is reported and not refused, because a second file written in
+  the canonical form is the usual reason.
+
 ### Fixed
 
 - A sign belongs to the word it touches. The identity signature recorded only

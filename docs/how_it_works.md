@@ -506,6 +506,19 @@ because the wrong guess changes a name and says nothing. A file read as
 `utf-8-sig` is written as `utf-8`, so a file that carried no byte order mark
 does not gain one.
 
+## A name that the mapping never saw
+
+`apply` can run against a second file with `--data`. That file may hold a name
+the mapping never saw, and that name may equal a name the mapping produces. The
+mapping renames `sample_1` to `sample1`, the second file already holds
+`sample1`, and both rows then read `sample1` although no person put the two
+names in one group.
+
+samplify reports this and does not refuse it. A second file written in the
+canonical form is the usual reason, and refusing would stop a correct run. The
+count is in the summary of the log as `names_joined_without_a_decision`, the
+names are in the log as `joined_without_a_decision`, and `apply` prints them.
+
 ## The guards
 
 The `apply` command refuses to run in each condition below. The list carries no
@@ -631,7 +644,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 558 offline tests, no key and no server
+uv run pytest                 # 560 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

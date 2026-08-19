@@ -521,6 +521,20 @@ def _run_apply(args: argparse.Namespace) -> int:
             f"[red]Groups {ids} all became {escape(name)}.[/red] "
             f"Those samples are now one sample in the output."
         )
+    # A name the mapping never held can equal a name the mapping produces, and
+    # the two rows then carry one name although no person put them in one
+    # group. It happens when --data names a second file, and the second file is
+    # often already written in the canonical form, so it is reported.
+    joined = log.get("joined_without_a_decision") or []
+    if joined:
+        shown = ", ".join(escape(name) for name in joined[:5])
+        more = "" if len(joined) <= 5 else f", and {len(joined) - 5} more"
+        console.print(
+            f"[yellow]{len(joined)} name(s) of this file already carry a name "
+            f"the mapping produces: {shown}{more}.[/yellow] Those rows join a "
+            f"group that no person put them in."
+        )
+
     for label, path in (
         ("Output CSV", args.output),
         ("JSON log", args.json_log),
