@@ -277,6 +277,14 @@ character, before the token rule and the signature read the name. The
 plus-minus sign and the double prime stand for themselves and fold into
 nothing.
 
+Two readings of the corpus settle the two characters that a reviewer asks about
+most. A hyphen between a letter and a digit appears in 3495 names, always as a
+delimiter or as part of a gene name, in shapes such as `IL-1b`, `Regnase-1`,
+`22Rv1_WT-1` and `24h-Control-1`. No two names differ only by such a hyphen, and
+no name uses it to mean negative. A percent sign appears in 31 names, always as
+a unit after a number, in shapes such as `10% FBS` against `5% FBS` where the
+number carries the identity. No two names differ only by a percent sign.
+
 The set of signs was measured against the corpus rather than guessed. The
 36073 names hold 18 distinct characters that are neither a letter nor a digit
 nor a space, and only three of them carry identity: the hyphen, the plus and the

@@ -1272,3 +1272,44 @@ def test_a_chain_carries_evidence_that_the_names_are_one_sample():
     ends = ["patietn1_batch1", "pateint1_batch1"]
     assert matching.damerau_levenshtein_distance(*matching.comparable_letters(*ends)) == 2
     assert len(matching.group_names(ends, method="damerau")) == 2
+
+
+def test_a_hyphen_between_a_letter_and_a_digit_separates():
+    """3495 names of the reference corpus hold this shape and none means negative.
+
+    A review read `dose-1` as a negative dose. The corpus says otherwise: the
+    shape appears as `IL-1b`, `Regnase-1`, `22Rv1_WT-1` and `24h-Control-1`,
+    where the hyphen is a delimiter or part of a gene name, and no two names of
+    the corpus differ only by such a hyphen. Reading it as a sign would keep
+    `p1-b1` apart from `p1_b1`, which is the difference this tool exists to
+    remove.
+    """
+    assert rules.prepare("dose-1_sample1") == "dose_1_sample1"
+    assert matching.group_names(["p1-b1", "p1_b1"], method="rules") == [["p1-b1", "p1_b1"]]
+
+    # A gene name carries the same shape, and the hyphen there is punctuation.
+    # `IL-1b` and `IL1b` are one gene, and they share one identity signature.
+    assert matching.digit_signature("IL-1b_s1") == matching.digit_signature("IL1b_s1")
+    assert matching.group_names(["IL-1b_s1", "IL1b_s1"], method="damerau") == [
+        ["IL-1b_s1", "IL1b_s1"]
+    ]
+
+    # A hyphen that ends a token is still a sign, which is the case that carries
+    # meaning: CD4- is the negative population and CD4+ is the positive one.
+    assert len(matching.group_names(["CD4-_donor1", "CD4_donor1"], method="rules")) == 2
+
+
+def test_a_percent_sign_is_a_unit_and_not_an_identity():
+    """31 names of the reference corpus hold one and no two differ only by it.
+
+    A review read `dose0.1%` against `dose0.1` as two samples. Every use in the
+    corpus is a unit after a number, as in `10% FBS` against `5% FBS`, and the
+    number carries the identity there. No pair of the 36073 names differs only
+    by a percent sign.
+    """
+    assert matching.digit_signature("hela_10%_fbs_1") != matching.digit_signature(
+        "hela_5%_fbs_1"
+    )
+    assert matching.rule_normalise("dose0.1%_sample1") == matching.rule_normalise(
+        "dose0.1_sample1"
+    )
