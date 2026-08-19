@@ -206,6 +206,14 @@ def _read_csv(path: Path, column: str, encoding: str = DEFAULT_ENCODING) -> pd.D
             f"A quote that is opened and never closed is the usual cause, "
             f"because it makes one row of every line after it."
         ) from exc
+    # pandas renames a repeated column name, so a header of `sample_id,note,note`
+    # reached the output as `sample_id,note,note.1`. The values were kept and
+    # the header was not, and samplify promises that every column it does not
+    # write reaches the output as it arrived. The names read by the csv module
+    # are the names of the file, so they are put back.
+    if len(header) == len(df.columns) and header != list(df.columns):
+        df.columns = header
+
     if column not in df.columns:
         # A tab separated file reads as one column whose name holds every
         # heading. The list of available columns then shows one entry that

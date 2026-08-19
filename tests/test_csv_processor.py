@@ -1244,3 +1244,32 @@ def test_the_line_number_of_a_ragged_row_counts_lines_and_not_rows(tmp_path):
         propose_csv(source, "sample_id", method="damerau")
 
     assert "Line 4" in str(error.value)
+
+
+def test_a_repeated_column_name_reaches_the_output_as_it_arrived(tmp_path):
+    """pandas renames the second one, and the header is part of the file.
+
+    A header of `sample_id,note,note` reached the output as
+    `sample_id,note,note.1`. The values were kept and the header was not.
+    """
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id,note,note\ns1,a,b\ns-1,c,d\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    mapping.mark_reviewed()
+    output = tmp_path / "out.csv"
+    apply_mapping(mapping, output_path=output)
+
+    lines = output.read_text().splitlines()
+    assert lines[0] == "sample_id,note,note,sample_id_canonical"
+    assert lines[1] == "s1,a,b,sample1"
+
+
+def test_a_repeated_sample_column_is_still_refused(tmp_path):
+    """Half the names would be invisible, so the header is not put back here."""
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id,sample_id\ns1,s2\n")
+
+    with pytest.raises(ValueError, match="appears 2 times"):
+        propose_csv(source, "sample_id", method="damerau")
