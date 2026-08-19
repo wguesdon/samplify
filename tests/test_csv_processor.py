@@ -1178,3 +1178,12 @@ def test_nothing_is_reported_when_the_data_holds_no_such_name(tmp_path):
     _, log = apply_mapping(mapping)
 
     assert log["joined_without_a_decision"] == []
+
+
+def test_a_nul_byte_in_the_header_is_refused(tmp_path):
+    """A NUL cuts a column name short, and the column asked for is not that one."""
+    source = tmp_path / "binary.csv"
+    source.write_bytes(b"sample_id\x00hidden,other\ns1,kept\n")
+
+    with pytest.raises(ValueError, match="NUL"):
+        propose_csv(source, "sample_id", method="damerau")

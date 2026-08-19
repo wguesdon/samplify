@@ -106,6 +106,13 @@ def _refuse_a_row_that_cannot_be_read(path: Path, header: list[str], reader: Any
     """
     if not header:
         return
+    # The header is a row too. A NUL in a column name cuts the name short, and
+    # the column the caller asked for then has a name that no longer matches.
+    if any("\x00" in value for value in header):
+        raise ValueError(
+            f"The header of {path} holds a NUL byte. The reader ends a column "
+            f"name at that byte and says nothing. The file is binary or damaged."
+        )
     try:
         for number, row in enumerate(reader, start=2):
             if len(row) > len(header):
