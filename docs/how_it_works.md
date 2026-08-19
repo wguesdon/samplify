@@ -481,6 +481,15 @@ header `sample_id,other` with the row `s1,x,extra` produced the name `x` and
 the name `s1` was gone. A row that holds fewer values is read, because the
 reader fills the missing place and nothing the file held is lost.
 
+A repeated column name reaches the output as the file wrote it. pandas renames
+the second one, so a header of `sample_id,note,note` came out as
+`sample_id,note,note.1`. The names that the `csv` module read are the names of
+the file, and they are put back. A repeated sample column is still refused,
+because half the names would be invisible.
+
+The file decides how a line ends. pandas writes the separator of the machine,
+so a file written on Windows came back with every CRLF replaced by a LF.
+
 A NUL byte in any column is refused. The reader that pandas uses ends a value
 at that byte and reports nothing, so a column samplify never touches would
 reach the output cut short.
@@ -652,7 +661,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 564 offline tests, no key and no server
+uv run pytest                 # 568 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

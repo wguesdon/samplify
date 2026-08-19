@@ -33,6 +33,11 @@ medium items.
   file. `--plot qc.unsupported` wrote the mapping and then failed at the draw,
   which contradicts the promise that samplify writes all of its files or none of
   them. A destination that is a directory is refused there as well.
+- A repeated column name reaches the output as the file wrote it. pandas renames
+  the second one, so a header of `sample_id,note,note` came out as
+  `sample_id,note,note.1`. The values were kept and the header was not.
+- The file decides how a line ends. pandas writes the separator of the machine,
+  so a file written on Windows came back with every CRLF replaced by a LF.
 - The header of a CSV is checked for a NUL byte, and not only the rows. The
   reader ends a column name at that byte, so the column the caller asked for is
   not the one it found.

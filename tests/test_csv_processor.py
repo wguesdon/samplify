@@ -1273,3 +1273,33 @@ def test_a_repeated_sample_column_is_still_refused(tmp_path):
 
     with pytest.raises(ValueError, match="appears 2 times"):
         propose_csv(source, "sample_id", method="damerau")
+
+
+@pytest.mark.parametrize(
+    "content,ending",
+    [
+        (b'sample_id,note\r\ns1,"two\r\nlines"\r\ns-1,plain\r\n', b"\r\n"),
+        (b"sample_id,note\ns1,a\ns-1,b\n", b"\n"),
+    ],
+)
+def test_the_file_decides_how_a_line_ends(tmp_path, content, ending):
+    """pandas writes the separator of the machine, and the file is the source.
+
+    A file written on Windows came back with every CRLF replaced by a LF, so
+    samplify had changed a file it was not asked to change.
+    """
+    source = tmp_path / "in.csv"
+    source.write_bytes(content)
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    mapping.mark_reviewed()
+    output = tmp_path / "out.csv"
+    apply_mapping(mapping, output_path=output)
+
+    written = output.read_bytes()
+    assert written.endswith(ending)
+    assert written.count(ending) == content.count(ending)
+    if ending == b"\r\n":
+        # The newline inside the quoted value is part of that value.
+        assert b'"two\r\nlines"' in written

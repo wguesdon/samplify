@@ -83,6 +83,21 @@ def _the_encoding_is_wrong(path: Path, encoding: str, exc: UnicodeDecodeError) -
     )
 
 
+def _how_a_line_ends(path: Path) -> str:
+    """Return the sequence that ends a line of this file.
+
+    Args:
+        path: The file to read.
+
+    Returns:
+        ``"\r\n"`` when the first line ends that way, and ``"\n"`` otherwise.
+        An empty file gives ``"\n"``.
+    """
+    with open(path, "rb") as fh:
+        first = fh.readline()
+    return "\r\n" if first.endswith(b"\r\n") else "\n"
+
+
 def _refuse_a_row_that_cannot_be_read(path: Path, header: list[str], reader: Any) -> None:
     """Stop on a row that the reader cannot carry to the output unchanged.
 
@@ -213,6 +228,11 @@ def _read_csv(path: Path, column: str, encoding: str = DEFAULT_ENCODING) -> pd.D
     # are the names of the file, so they are put back.
     if len(header) == len(df.columns) and header != list(df.columns):
         df.columns = header
+
+    # The file decides how a line ends. pandas writes the separator of the
+    # machine, so a file written on Windows came back with every CRLF replaced
+    # by a LF, and samplify had changed a file it was not asked to change.
+    df.attrs["line_terminator"] = _how_a_line_ends(path)
 
     if column not in df.columns:
         # A tab separated file reads as one column whose name holds every
@@ -949,7 +969,12 @@ def apply_mapping(
         # not to touch. utf-8-sig is a reading name here: it strips the byte
         # order mark, and writing it back would put one in a file that had
         # none, so the plain codec writes.
-        df.to_csv(output_path, index=False, encoding=_writing_codec(resolved_encoding))
+        df.to_csv(
+            output_path,
+            index=False,
+            encoding=_writing_codec(resolved_encoding),
+            lineterminator=df.attrs.get("line_terminator", "\n"),
+        )
     if json_log_path is not None:
         import json
 
