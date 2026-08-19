@@ -25,6 +25,8 @@ is the case this tool exists for.
   character, so normalisation deleted it and the identity signature never saw
   it. A journal writes a population that way. The superscript and the subscript
   forms of the plus and the minus now read as the ASCII ones.
+- The minus-or-plus sign joins the signs. It is the plus-minus sign written the
+  other way round, and that one was already there.
 - An empty name is not canonical. The search for a forbidden character finds
   nothing in an empty string, so `rules.is_canonical` answered yes about a name
   that identifies nothing.

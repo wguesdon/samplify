@@ -36,6 +36,7 @@ IDENTITY_SIGNS = (
     "\u2033"  # DOUBLE PRIME
     "\u2019"  # RIGHT SINGLE QUOTATION MARK, which a word processor makes of '
     "\u00b1"  # PLUS-MINUS SIGN
+    "\u2213"  # MINUS-OR-PLUS SIGN, the same sign written the other way round
     "\uff0b"  # FULLWIDTH PLUS SIGN
     "\u207a"  # SUPERSCRIPT PLUS SIGN, which is how a journal writes CD4+
     "\u208a"  # SUBSCRIPT PLUS SIGN

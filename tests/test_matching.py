@@ -1145,3 +1145,25 @@ def test_a_superscript_sign_is_the_sign_it_writes(left, right):
     """One statement written in two typefaces is one statement."""
     assert matching.digit_signature(left) == matching.digit_signature(right)
     assert matching.group_names([left, right], method="rules") == [sorted([left, right])]
+
+
+def test_the_set_of_signs_covers_every_identity_character_of_the_corpus():
+    """The signs were measured against real data and not chosen.
+
+    The 36073 names of the reference corpus hold 18 characters that are neither
+    a letter nor a digit nor a space. Three of them carry identity, and all
+    three are kept. The other fifteen separate or decorate, and each one is
+    dropped.
+    """
+    carries_identity = "-+'"
+    separates_or_decorates = '_,.()#/:"[]%=?>'
+
+    for character in carries_identity:
+        assert matching.digit_signature(f"cd4{character}_donor1") != matching.digit_signature(
+            "cd4_donor1"
+        ), character
+
+    for character in separates_or_decorates:
+        assert matching.rule_normalise(f"cd4{character}_donor1") == matching.rule_normalise(
+            "cd4_donor1"
+        ), character

@@ -277,6 +277,20 @@ character, before the token rule and the signature read the name. The
 plus-minus sign and the double prime stand for themselves and fold into
 nothing.
 
+The set of signs was measured against the corpus rather than guessed. The
+36073 names hold 18 distinct characters that are neither a letter nor a digit
+nor a space, and only three of them carry identity: the hyphen, the plus and the
+apostrophe. All three are kept. The other fifteen are `_ , . ( ) # / : " [ ] %
+= ? >`, and each one separates or decorates. Deleting `%` makes `5%` and `5`
+one name, and the number carries the identity in both.
+
+A sign that a journal writes in a superscript is the same sign. `CD4⁺` and
+`CD4⁻` are a positive and a negative population, and the superscript plus is a
+mathematical symbol rather than a word character, so normalisation deleted it
+and the identity signature never saw it. The two names became one string and the
+rules path merged them with no distance computed at all. Version 0.18.0 reads
+the superscript and the subscript forms as the ASCII ones.
+
 The number sign is deliberately not a sign. In `#111_b2` it reads as the word
 number and it identifies nothing. The asterisk is absent for the same reason,
 because it marks a footnote more often than a sample.
