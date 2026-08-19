@@ -946,6 +946,16 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     if method == "rules":
         return False
 
+    # A label added at the end of a name is not a slipped keystroke either.
+    # `sample_A` and `sample_AA` are two identifiers, and the delimiter is what
+    # let the rule above see it: the differing token is `a` against `aa`, which
+    # is short, and the ratio refuses it. Written compactly as `SampleA` and
+    # `SampleAA` the same difference sits inside one token of eight letters, and
+    # the ratio reads 0.933 and merges two samples. No pair of the reference
+    # corpus merges on this shape, so refusing it costs nothing there.
+    if left != right and (left.startswith(right) or right.startswith(left)):
+        return False
+
     # Two names with no letter at all score 1.0 against each other, because the
     # ratio compares two empty strings. A name of that shape carries no
     # evidence, so the ratio may not decide it. Two names that differ only in

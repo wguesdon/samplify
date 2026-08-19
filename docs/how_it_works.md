@@ -305,6 +305,19 @@ On the ENA corpus this rule removed 30 merges and added none. `ICESeq(+)`,
 `ICESeq(++)` and `ICESeq(-)` are three conditions of PRJDA74549 that samplify
 had joined into one sample.
 
+## A label added at the end
+
+`sample_A` and `sample_AA` are two identifiers, and the delimiter is what lets
+the token rule see it. The differing token is `a` against `aa`, which is short,
+and the ratio refuses the pair. Written compactly as `SampleA` and `SampleAA`
+the same difference sits inside one token of eight letters, where the ratio
+reads 0.933 and merged two samples.
+
+The rule is therefore that one comparable string may not be a prefix of the
+other. A letter added at the end of a name is a label, and a slipped keystroke
+lands inside the name far more often than at its end. No pair of the reference
+corpus merges on this shape, so the rule removes none of the 26 merges.
+
 ## When a distance is enough on its own
 
 A ratio threshold does not find a typing error in a short name. The pair `smple`

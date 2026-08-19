@@ -741,7 +741,9 @@ def test_a_chain_of_one_edit_steps_may_span_two_edits():
     The reference corpus holds no group in which a pair joined by a distance
     sits above the cap, so nothing real depends on this either way.
     """
-    chain = ["abcdefgh1", "abcdefg1", "abcdef1"]
+    # Each step is one letter inserted inside the name. A letter added at the
+    # end is a label and not a slip, and the rule above refuses that shape.
+    chain = ["axbcdef1", "abcdef1", "abcdyef1"]
     assert matching.group_names(chain, method="damerau") == [sorted(chain)]
 
     # The two ends alone are two edits apart, and alone they do not merge.
@@ -749,7 +751,7 @@ def test_a_chain_of_one_edit_steps_may_span_two_edits():
     assert matching.damerau_levenshtein_distance(
         matching.letter_skeleton(ends[0]), matching.letter_skeleton(ends[1])
     ) == 2
-    assert matching.group_names(ends, method="damerau") == [[ends[1]], [ends[0]]]
+    assert matching.group_names(ends, method="damerau") == [sorted(ends)[:1], sorted(ends)[1:]]
 
 
 # ── A character that int cannot read ───────────────────────────────────────
@@ -1215,3 +1217,35 @@ def test_another_script_is_another_sample(pair):
     """
     assert matching.digit_signature(pair[0]) != matching.digit_signature(pair[1])
     assert len(matching.group_names(list(pair), method="rules")) == 2
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ("SampleA", "SampleAA"),     # the compact form of the pair below
+        ("sample_A", "sample_AA"),   # two identifiers, and the corpus holds this
+        ("sample", "samplee"),       # a label added, or a letter typed twice
+        ("ctrl", "ctrls"),
+    ],
+)
+def test_a_label_added_at_the_end_is_not_a_slipped_keystroke(left, right):
+    """The delimiter was doing the work, and the compact form escaped.
+
+    `sample_A` and `sample_AA` differ in a token of one letter against two, and
+    the ratio refuses that. `SampleA` and `SampleAA` hold the same difference
+    inside one token of eight letters, where the ratio reads 0.933 and merged
+    two samples. No pair of the reference corpus merges on this shape.
+    """
+    assert len(matching.group_names([left, right], method="damerau")) == 2
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ("smple_1", "sample_1"),          # a letter dropped inside the name
+        ("patinet1_b1", "patient1_b1"),   # a transposition, and the corpus holds it
+    ],
+)
+def test_a_slip_inside_the_name_still_merges(left, right):
+    """The rule reads the end of the name and nothing else."""
+    assert matching.group_names([left, right], method="damerau") == [sorted([left, right])]

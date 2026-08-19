@@ -13,6 +13,19 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.19.0] - 2026-08-19
+
+The tenth review with no list of past findings reports one major item.
+
+### Fixed
+
+- A label added at the end of a name is not a slipped keystroke. `sample_A` and
+  `sample_AA` are two identifiers and the ratio refuses them, because the
+  differing token is short. Written compactly as `SampleA` and `SampleAA` the
+  same difference sits inside one token of eight letters, the ratio read 0.933
+  and the two samples merged. One comparable string may no longer be a prefix
+  of the other. No pair of the reference corpus merges on this shape.
+
 ## [0.18.0] - 2026-08-19
 
 The ninth review with no list of past findings reports one major item, and it
