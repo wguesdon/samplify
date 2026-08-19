@@ -1187,3 +1187,17 @@ def test_a_nul_byte_in_the_header_is_refused(tmp_path):
 
     with pytest.raises(ValueError, match="NUL"):
         propose_csv(source, "sample_id", method="damerau")
+
+
+def test_the_line_number_of_a_ragged_row_counts_lines_and_not_rows(tmp_path):
+    """A value that holds a newline makes one row of two lines.
+
+    The number must be the line a person sees in an editor.
+    """
+    source = tmp_path / "multiline.csv"
+    source.write_text('sample_id,note\ns1,"two\nlines"\ns2,x,extra\n')
+
+    with pytest.raises(ValueError) as error:
+        propose_csv(source, "sample_id", method="damerau")
+
+    assert "Line 4" in str(error.value)

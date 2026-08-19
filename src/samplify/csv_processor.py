@@ -114,7 +114,10 @@ def _refuse_a_row_that_cannot_be_read(path: Path, header: list[str], reader: Any
             f"name at that byte and says nothing. The file is binary or damaged."
         )
     try:
-        for number, row in enumerate(reader, start=2):
+        for row in reader:
+            # reader.line_num counts lines and not records, so a value that
+            # holds a newline still reports the line a person sees in an editor.
+            number = reader.line_num
             if len(row) > len(header):
                 raise ValueError(
                     f"Line {number} of {path} holds {len(row)} values and the "
