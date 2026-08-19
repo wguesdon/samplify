@@ -39,12 +39,18 @@ SURFACE = "#ffffff"
 #: 24 are a difference of formatting, one is a real transposition and one moves
 #: a replicate number. The six that 0.14.0 removed were reported as correct
 #: after 0.7.0, and they were not.
+#:
+#: The rules of 0.15.0 to 0.19.0 remove none of the 26. Each one refuses a shape
+#: that this corpus does not hold: a sign written in another typeface, a
+#: fullwidth character, a token substituted inside a longer difference and a
+#: label added at an end of a name. The last row records that.
 ROWS: tuple[tuple[str, str, int, int], ...] = (
     ("0.4.1", "before the validation", 26, 324),
     ("0.5.0", "an edit cap of one", 26, 78),
     ("0.6.0", "a sign identifies a sample", 26, 48),
     ("0.7.0", "a substitution is reported, not merged", 26, 6),
     ("0.14.0", "a difference is judged by its token", 26, 0),
+    ("0.19.0", "a label added at an end is not a slip", 26, 0),
 )
 
 #: The gap between the two segments of a bar, in units of the x axis. At this

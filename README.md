@@ -212,6 +212,11 @@ the sign class and all 42 of the substitution class were read, and a sample of
 the 246 that the edit cap removed. Every one of them joined two different
 samples.
 
+The rules of versions 0.15.0 to 0.19.0 remove none of the 26. Each one refuses
+a shape that this corpus does not hold: a sign written in another typeface, a
+fullwidth character, a token substituted inside a longer difference, and a label
+added at an end of a name. The last bar of the figure records that.
+
 The script `docs/make_validation_figure.py` redraws the figure, and
 [docs/how_it_works.md](docs/how_it_works.md) gives the rule that each version
 added.
