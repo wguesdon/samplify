@@ -497,6 +497,7 @@ def _run_apply(args: argparse.Namespace) -> int:
             json_log_path=args.json_log,
             csv_log_path=args.csv_log,
             mapping_path=str(args.mapping),
+            encoding=args.encoding,
         )
     except (ValueError, FileNotFoundError) as exc:
         _print_error(exc)
@@ -710,6 +711,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="canonical_column",
         default=None,
         help="Name of the new column (default: {column}_canonical).",
+    )
+    apply_parser.add_argument(
+        "--encoding",
+        default=None,
+        help=(
+            "The character encoding of the CSV (default: the one recorded in "
+            "the mapping). Name it here when --data points at a file in "
+            "another encoding."
+        ),
     )
     apply_parser.add_argument("--json-log", dest="json_log", default=None, help="JSON log path.")
     apply_parser.add_argument("--csv-log", dest="csv_log", default=None, help="CSV log path.")

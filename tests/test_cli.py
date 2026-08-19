@@ -254,3 +254,26 @@ def test_propose_writes_all_of_its_files_or_none_of_them(tmp_path, capsys):
     assert code == 1
     assert "all of its files or none" in " ".join(capsys.readouterr().out.split())
     assert not (tmp_path / "mapping.json").exists()
+
+
+def test_apply_can_be_given_an_encoding_for_another_data_file(tmp_path):
+    """--data may point at a file the mapping was not built from."""
+    utf8 = tmp_path / "utf8.csv"
+    utf8.write_text("sample_id\nsample_1\nsample-1\n", encoding="utf-8")
+    windows = tmp_path / "windows.csv"
+    windows.write_bytes("sample_id\nsample_1\nsample-1\ncafé_2\n".encode("cp1252"))
+
+    mapping_path = tmp_path / "mapping.json"
+    assert cli.main([
+        "propose", str(utf8), "-c", "sample_id", "-M", "damerau",
+        "-o", str(mapping_path), "--yes",
+    ]) == 0
+
+    output = tmp_path / "out.csv"
+    code = cli.main([
+        "apply", str(mapping_path), "--data", str(windows),
+        "--encoding", "cp1252", "-o", str(output),
+    ])
+
+    assert code == 0
+    assert "café_2" in output.read_text(encoding="cp1252")

@@ -8,6 +8,8 @@ name must block it too unless a person looked at them.
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 
 import pytest
 
@@ -674,3 +676,89 @@ def test_a_whole_number_is_read_however_it_is_written(identifier, expected):
          "status": STATUS_ACCEPTED}
     )
     assert group.id == expected
+
+
+def test_a_mapping_file_is_utf8_whatever_the_locale_of_the_machine(tmp_path):
+    """A container or a batch node runs under LC_ALL=C, where ASCII is default.
+
+    A name that holds an accent could then neither be written nor read, and the
+    error named the ASCII codec and no file. JSON is UTF-8 by definition, so
+    both ends name it.
+    """
+    import subprocess
+    import sys
+
+    path = tmp_path / "mapping.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "groups": [
+                    {
+                        "id": 1,
+                        "members": ["café_1"],
+                        "status": "accepted",
+                        "proposed": "cafe_1",
+                        "final": "cafe_1",
+                        "occurrences": {"café_1": 1},
+                        "method": "damerau",
+                        "min_similarity": 1.0,
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    written = tmp_path / "again.json"
+    # The script goes in a file rather than on the command line. A C-locale
+    # process cannot decode a non-ASCII argument, and the failure would be the
+    # harness and not the library.
+    script = tmp_path / "run.py"
+    script.write_text(
+        "# -*- coding: utf-8 -*-\n"
+        "from samplify import mapping\n"
+        f"m = mapping.read({str(path)!r})\n"
+        "assert m.groups[0].members == ['caf\u00e9_1'], m.groups[0].members\n"
+        f"mapping.write(m, {str(written)!r})\n"
+        "print('ok')\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "LC_ALL": "C",
+            "LANG": "C",
+            "PYTHONUTF8": "0",
+            "PYTHONCOERCECLOCALE": "0",
+            "PYTHONPATH": str(Path(__file__).resolve().parent.parent / "src"),
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout
+    again = json.loads(written.read_text(encoding="utf-8"))
+    assert again["groups"][0]["members"] == ["café_1"]
+    # The file keeps the characters of the name, because a person reads it.
+    assert "café_1" in written.read_text(encoding="utf-8")
+
+
+def test_a_mapping_file_in_another_encoding_names_itself(tmp_path):
+    """An editor that saved it as cp1252 gave a codec name and no file."""
+    path = tmp_path / "mapping.json"
+    path.write_bytes(
+        b'{"schema_version": 1, "groups": [{"id": 1, "members": ["caf\xe9_1"], '
+        b'"status": "accepted", "proposed": "cafe_1", "final": "cafe_1", '
+        b'"occurrences": {"caf\xe9_1": 1}, "method": "damerau", '
+        b'"min_similarity": 1.0}]}'
+    )
+
+    with pytest.raises(ValueError) as error:
+        mapping_module.read(path)
+
+    message = str(error.value)
+    assert "mapping.json" in message
+    assert "UTF-8" in message

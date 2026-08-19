@@ -626,6 +626,7 @@ def apply_mapping(
     json_log_path: str | os.PathLike | None = None,
     csv_log_path: str | os.PathLike | None = None,
     mapping_path: str | None = None,
+    encoding: str | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """Apply a reviewed mapping to a CSV, with no model call.
 
@@ -644,6 +645,9 @@ def apply_mapping(
         json_log_path: Where to write the JSON log.
         csv_log_path: Where to write the change table as CSV.
         mapping_path: The mapping file path, recorded in the log.
+        encoding: The character encoding of the CSV, which is read and written.
+            Defaults to the one recorded in the mapping, and a caller names it
+            here when ``data_path`` points at a file in another encoding.
 
     Returns:
         A tuple of the DataFrame with the canonical column added, and the log.
@@ -687,8 +691,9 @@ def apply_mapping(
             f"Run 'samplify review' and decide, or edit the mapping file."
         )
 
+    resolved_encoding = encoding or mapping.encoding
     path = Path(resolved_data)
-    df = _read_csv(path, resolved_column, mapping.encoding)
+    df = _read_csv(path, resolved_column, resolved_encoding)
 
     # The mapping was built from one column of one file. Applying it to a file
     # that shares no name with it changes nothing, and the log still reports
@@ -829,15 +834,21 @@ def apply_mapping(
         # not to touch. utf-8-sig is a reading name here: it strips the byte
         # order mark, and writing it back would put one in a file that had
         # none, so the plain codec writes.
-        df.to_csv(output_path, index=False, encoding=_writing_codec(mapping.encoding))
+        df.to_csv(output_path, index=False, encoding=_writing_codec(resolved_encoding))
     if json_log_path is not None:
         import json
 
-        with open(json_log_path, "w") as fh:
+        # The log is JSON, which is UTF-8. A batch node runs under LC_ALL=C,
+        # where the default is ASCII.
+        with open(json_log_path, "w", encoding="utf-8") as fh:
             json.dump(log, fh, indent=2)
             fh.write("\n")
     if csv_log_path is not None:
-        pd.DataFrame(changes).to_csv(csv_log_path, index=False)
+        # The change log holds sample names, so it carries the encoding of the
+        # file they came from. A person opens it in the same spreadsheet.
+        pd.DataFrame(changes).to_csv(
+            csv_log_path, index=False, encoding=_writing_codec(resolved_encoding)
+        )
 
     return df, log
 

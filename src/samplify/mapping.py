@@ -575,8 +575,15 @@ def write(mapping: MappingFile, path: str | Path) -> Path:
     path = Path(path)
     temporary = path.with_name(f"{path.name}.tmp")
     try:
-        with open(temporary, "w") as fh:
-            json.dump(mapping.to_dict(), fh, indent=2)
+        # JSON is UTF-8, and the encoding is named rather than left to the
+        # machine. A container or a batch node runs under LC_ALL=C, where the
+        # default is ASCII, and a name that holds an accent could then neither
+        # be written nor read.
+        with open(temporary, "w", encoding="utf-8") as fh:
+            # ensure_ascii is False, so a name keeps its own characters. This
+            # file is read and edited by a person, and `caf\u00e9_1` is the
+            # same name written in a form nobody can check at a glance.
+            json.dump(mapping.to_dict(), fh, indent=2, ensure_ascii=False)
             fh.write("\n")
         os.replace(temporary, path)
     except BaseException:
@@ -600,10 +607,17 @@ def read(path: str | Path) -> MappingFile:
     """
     path = Path(path)
     try:
-        with open(path) as fh:
+        with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
     except json.JSONDecodeError as exc:
         raise ValueError(f"{path} is not valid JSON: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"{path} is not text in UTF-8, and a JSON document is UTF-8. Byte "
+            f"{exc.object[exc.start]:#04x} at position {exc.start} is not "
+            f"valid. An editor that saved the file in another encoding is the "
+            f"usual cause."
+        ) from exc
 
     mapping = MappingFile.from_dict(data)
     mapping.source_path = str(path)

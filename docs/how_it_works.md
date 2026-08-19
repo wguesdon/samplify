@@ -475,7 +475,13 @@ an output of two rows until version 0.14.2. A property test now reads the
 expected count with the `csv` module of the standard library and compares it
 against the count that `apply` wrote.
 
-The default encoding is `utf-8-sig`, which reads a file that a spreadsheet
+A mapping file is UTF-8 in every condition, because a JSON document is UTF-8 by
+definition. The reader and the writer both name it, so a container or a batch
+node that runs under `LC_ALL=C` handles a name that holds an accent. The file
+keeps the characters of a name rather than escaping them, because a person reads
+this file and decides from it.
+
+The default encoding of the CSV is `utf-8-sig`, which reads a file that a spreadsheet
 wrote and strips its byte order mark. A spreadsheet on Windows writes cp1252
 instead, and that file raised a decoding error that named a byte and no file.
 The option `--encoding` names the encoding, `propose` records it in the mapping
@@ -609,7 +615,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 548 offline tests, no key and no server
+uv run pytest                 # 551 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

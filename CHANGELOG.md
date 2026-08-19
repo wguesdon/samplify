@@ -20,6 +20,9 @@ finding is the sign that two typefaces write two ways.
 
 ### Added
 
+- The option `--encoding` on `apply` reads a data file in another encoding than
+  the one the mapping records. It is needed when `--data` points at a second
+  file.
 - The option `--encoding` names the character encoding of the CSV. A spreadsheet
   on Windows writes cp1252, and that file raised a decoding error that named a
   byte and no file. `propose` records the value in the mapping file, and `apply`
@@ -30,6 +33,12 @@ finding is the sign that two typefaces write two ways.
 
 ### Fixed
 
+- A mapping file is UTF-8 whatever the locale of the machine. A container and a
+  batch node run under `LC_ALL=C`, where the default is ASCII, and a name that
+  held an accent could then neither be written nor read. Both ends now name the
+  encoding, because a JSON document is UTF-8 by definition, and a file in
+  another encoding names itself in the error. The file also keeps the
+  characters of a name rather than escaping them, because a person reads it.
 - One sign written two ways is one sign. `rules.IDENTITY_SIGNS` and
   `rules.HYPHENS` made the typographic forms count, and the identity signature
   then kept the raw character, so `CD4-` and `CD4−` carried two identities and
