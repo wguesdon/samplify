@@ -1226,15 +1226,21 @@ def test_another_script_is_another_sample(pair):
         ("sample_A", "sample_AA"),   # two identifiers, and the corpus holds this
         ("sample", "samplee"),       # a label added, or a letter typed twice
         ("ctrl", "ctrls"),
+        ("Usamplebatchone1", "samplebatchone1"),   # the same shape at the front
+        ("USMB1", "SMB1"),                         # the corpus pair, written short
     ],
 )
-def test_a_label_added_at_the_end_is_not_a_slipped_keystroke(left, right):
+def test_a_label_added_at_either_end_is_not_a_slipped_keystroke(left, right):
     """The delimiter was doing the work, and the compact form escaped.
 
     `sample_A` and `sample_AA` differ in a token of one letter against two, and
     the ratio refuses that. `SampleA` and `SampleAA` hold the same difference
     inside one token of eight letters, where the ratio reads 0.933 and merged
-    two samples. No pair of the reference corpus merges on this shape.
+    two samples.
+
+    The front of the name reads the same way. `SM B from healthy control` and
+    `USM B from healthy control` are two samples of the reference corpus. No
+    pair of that corpus merges on either shape.
     """
     assert len(matching.group_names([left, right], method="damerau")) == 2
 

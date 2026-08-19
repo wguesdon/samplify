@@ -19,12 +19,14 @@ The tenth review with no list of past findings reports one major item.
 
 ### Fixed
 
-- A label added at the end of a name is not a slipped keystroke. `sample_A` and
-  `sample_AA` are two identifiers and the ratio refuses them, because the
+- A label added at either end of a name is not a slipped keystroke. `sample_A`
+  and `sample_AA` are two identifiers and the ratio refuses them, because the
   differing token is short. Written compactly as `SampleA` and `SampleAA` the
   same difference sits inside one token of eight letters, the ratio read 0.933
-  and the two samples merged. One comparable string may no longer be a prefix
-  of the other. No pair of the reference corpus merges on this shape.
+  and the two samples merged. The front of the name reads the same way, and
+  `SM B from healthy control` against `USM B from healthy control` is that pair
+  in the reference corpus. Neither comparable string may be a prefix or a suffix
+  of the other. No pair of the corpus merges on either shape.
 
 ## [0.18.0] - 2026-08-19
 

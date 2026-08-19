@@ -946,14 +946,24 @@ def _matches(a: str, b: str, *, method: str, threshold: float) -> bool:
     if method == "rules":
         return False
 
-    # A label added at the end of a name is not a slipped keystroke either.
+    # A label added at either end of a name is not a slipped keystroke either.
     # `sample_A` and `sample_AA` are two identifiers, and the delimiter is what
     # let the rule above see it: the differing token is `a` against `aa`, which
     # is short, and the ratio refuses it. Written compactly as `SampleA` and
     # `SampleAA` the same difference sits inside one token of eight letters, and
-    # the ratio reads 0.933 and merges two samples. No pair of the reference
-    # corpus merges on this shape, so refusing it costs nothing there.
-    if left != right and (left.startswith(right) or right.startswith(left)):
+    # the ratio reads 0.933 and merges two samples.
+    #
+    # The front of the name reads the same way. `SM B from healthy control` and
+    # `USM B from healthy control` are two samples of the reference corpus, and
+    # the same two written `SMB` and `USMB` were kept apart only because the
+    # ratio can see a difference of one letter in four. No pair of the corpus
+    # merges on either shape, so refusing both costs nothing there.
+    if left != right and (
+        left.startswith(right)
+        or right.startswith(left)
+        or left.endswith(right)
+        or right.endswith(left)
+    ):
         return False
 
     # Two names with no letter at all score 1.0 against each other, because the
