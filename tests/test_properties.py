@@ -366,3 +366,28 @@ def test_every_value_of_a_column_the_tool_does_not_write_survives(names):
         written = pd.read_csv(output, dtype=str, keep_default_na=False)
         assert list(written["note"]) == [f"a,b {name}" for name in names]
         assert list(written["n"]) == [str(i) for i in range(len(names))]
+
+
+@given(names=name_lists, method=st.sampled_from(matching.OFFLINE_METHODS))
+@settings(max_examples=400, deadline=None)
+def test_no_group_joins_two_names_where_one_is_a_label_of_the_other(names, method):
+    """A label added at an end of a name is not a slipped keystroke.
+
+    Grouping is transitive and the match rule is not, so this claim is not
+    implied by the rule that refuses the pair. A pair that normalises to one
+    string is exempt, because no distance decided it.
+    """
+    for group in matching.group_names(names, method=method):
+        for index, left in enumerate(group):
+            for right in group[index + 1:]:
+                if matching.rule_normalise(left) == matching.rule_normalise(right):
+                    continue
+                first, second = matching.comparable_letters(left, right)
+                if first == second:
+                    continue
+                assert not (
+                    first.startswith(second)
+                    or second.startswith(first)
+                    or first.endswith(second)
+                    or second.endswith(first)
+                ), (left, right, first, second)
