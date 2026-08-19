@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from samplify import cli
+from samplify import matching
 from samplify.csv_processor import propose_csv
 from samplify.mapping import MappingFile
 
@@ -167,3 +168,20 @@ def test_a_format_matplotlib_cannot_write_gives_an_error(tmp_path, capsys):
 
     assert cli.main(["plot", str(path), "-o", str(tmp_path / "qc.json")]) == 1
     assert "could not be written" in " ".join(capsys.readouterr().out.split())
+
+
+def test_the_panel_shows_the_value_that_decided_the_pair():
+    """The decision reads the differing token, and the panel read the whole
+    name, so `sample_A` against `sample_AA` showed 0.875 while the tool had
+    refused the pair."""
+    from samplify.plots import _similarity_matrix
+
+    refused = _similarity_matrix(["sample_A", "sample_AA"])[0][1]
+    assert refused < 0.85
+    assert len(matching.group_names(["sample_A", "sample_AA"], method="damerau")) == 2
+
+    merged = _similarity_matrix(["patient1_batch1", "patietn1_batch1"])[0][1]
+    assert merged >= 0.85
+    assert len(matching.group_names(
+        ["patient1_batch1", "patietn1_batch1"], method="damerau"
+    )) == 1

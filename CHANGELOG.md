@@ -13,6 +13,21 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.14.2] - 2026-08-19
+
+The fifth review with no list of past findings. Its one finding loses a row.
+
+### Fixed
+
+- A blank line in a CSV is a row and it reaches the output. pandas drops an
+  empty line by default, so a file of three rows gave an output of two, and a
+  row lost is the one thing this tool must never do. A whitespace-only cell was
+  already kept, and a truly empty line was not.
+- The similarity panel of the figure scores the letters that decided each pair,
+  which is the differing token when there is one. It scored the whole name, so
+  `sample_A` against `sample_AA` showed 0.875 and read as agreement while the
+  tool had refused the pair.
+
 ## [0.14.1] - 2026-08-19
 
 The fourth review with no list of past findings reported that it found no major

@@ -110,7 +110,10 @@ def _similarity_matrix(names: list[str]) -> list[list[float]]:
     The cell holds the value that decided the group, which is a conjunction of
     two rules. A pair whose digit signatures differ was never compared, so it
     scores 0.0 whatever its letters look like. A pair inside one signature
-    scores the similarity of the two letter skeletons.
+    scores the similarity of the letters that decided it, which is the one
+    differing token when there is one and the whole letter skeleton otherwise.
+    Scoring the whole name showed `sample_A` against `sample_AA` as 0.875,
+    which reads as agreement, while the tool had refused that pair.
 
     Version 0.3.0 scored the whole raw name. That measure took no part in the
     decision, and it painted a pair that the identity rule had refused in the
@@ -122,17 +125,28 @@ def _similarity_matrix(names: list[str]) -> list[list[float]]:
     Returns:
         A square matrix of similarities between 0.0 and 1.0.
     """
-    skeletons = [matching.letter_skeleton(n) for n in names]
-    signatures = [matching.digit_signature(n) for n in names]
+    signatures = [matching.digit_signature(name) for name in names]
     return [
         [
-            matching.similarity(a, b, method=matching.DEFAULT_DISTANCE)
-            if signature_a == signature_b
-            else 0.0
-            for b, signature_b in zip(skeletons, signatures)
+            _decided_by(left, right) if signature_a == signature_b else 0.0
+            for right, signature_b in zip(names, signatures)
         ]
-        for a, signature_a in zip(skeletons, signatures)
+        for left, signature_a in zip(names, signatures)
     ]
+
+
+def _decided_by(left: str, right: str) -> float:
+    """Score the letters that decided whether two names are one sample.
+
+    Args:
+        left: The first name.
+        right: The second name.
+
+    Returns:
+        The similarity of the letters the decision read.
+    """
+    first, second = matching.comparable_letters(left, right)
+    return matching.similarity(first, second, method=matching.DEFAULT_DISTANCE)
 
 
 def _panel_heatmap(ax: Any, mapping: MappingFile) -> None:

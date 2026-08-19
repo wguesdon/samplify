@@ -82,7 +82,16 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
             f"invisible. Give each column its own name."
         )
 
-    df = pd.read_csv(path, dtype=str, keep_default_na=False, na_filter=False)
+    # skip_blank_lines is False, because the default drops an empty line and
+    # that line is a row of the file. The output then held fewer rows than the
+    # input, which is the one thing this tool must never do.
+    df = pd.read_csv(
+        path,
+        dtype=str,
+        keep_default_na=False,
+        na_filter=False,
+        skip_blank_lines=False,
+    )
     if column not in df.columns:
         # A tab separated file reads as one column whose name holds every
         # heading. The list of available columns then shows one entry that

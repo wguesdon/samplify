@@ -104,3 +104,44 @@ def test_a_pair_that_needs_a_person_is_kept_apart_and_reported(names, label):
     assert len(matching.group_names(names, method="damerau")) == 2, label
     reported = matching.find_near_misses(names) + matching.find_letter_variants(names)
     assert reported, label
+
+
+def test_a_blank_line_is_a_row_and_survives(tmp_path):
+    """pandas drops an empty line by default, and that line is a row.
+
+    The output then held fewer rows than the input, which is the one thing this
+    tool must never do.
+    """
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id,n\nsample_1,1\n\nsample_2,3\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    output = tmp_path / "out.csv"
+    frame, log = apply_mapping(mapping, output_path=output)
+
+    assert len(frame) == 3
+    assert log["summary"]["total_rows"] == 3
+
+    written = pd.read_csv(output, dtype=str, keep_default_na=False)
+    assert list(written["sample_id"]) == ["sample_1", "", "sample_2"]
+    assert list(written["n"]) == ["1", "", "3"]
+
+
+@pytest.mark.parametrize(
+    "content,rows",
+    [
+        ("sample_id\nsample_1\n\nsample_2\n", 3),
+        ("sample_id\n\n\n", 2),
+        ("sample_id\nsample_1\n   \nsample_2\n", 3),
+        ("sample_id\nsample_1\n", 1),
+    ],
+)
+def test_the_output_holds_one_row_for_each_input_row(tmp_path, content, rows):
+    source = tmp_path / "in.csv"
+    source.write_text(content)
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    frame, _ = apply_mapping(mapping)
+    assert len(frame) == rows
