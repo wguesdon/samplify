@@ -48,3 +48,25 @@ def test_every_entry_says_something():
     sections = re.split(r"^## \[[0-9]+\.[0-9]+\.[0-9]+\][^\n]*\n", CHANGELOG, flags=re.M)
     for version, body in zip(VERSIONS, sections[1:]):
         assert body.strip(), version
+
+
+def test_every_signature_the_document_shows_is_the_one_the_code_gives():
+    """A document that shows an output is showing a promise.
+
+    The sign gained a position marker and the document kept the old example, so
+    a reader would have been told `("1", "+")` where the code gives
+    `("1", "0+")`.
+    """
+    from samplify import matching
+
+    document = (ROOT / "docs" / "how_it_works.md").read_text()
+    shown = re.findall(
+        r"signature of `([^`]+)` is `\(([^)]*)\)`", document
+    )
+    assert shown, "the document shows no signature"
+
+    for name, written in shown:
+        expected = str(matching.digit_signature(name)).strip("()")
+        assert written.replace('"', "'").rstrip(",").strip() == (
+            expected.replace('"', "'").rstrip(",").strip()
+        ), name

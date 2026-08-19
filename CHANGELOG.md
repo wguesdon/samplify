@@ -13,6 +13,26 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.14.1] - 2026-08-19
+
+The fourth review with no list of past findings reported that it found no major
+defect. Its one finding is below.
+
+### Fixed
+
+- `docs/how_it_works.md` showed the signature of a sign without its position
+  marker. The sign gained that marker in 0.13.0 and the example kept the old
+  form, so a reader was told `("1", "+")` where the code gives `("1", "0+")`.
+
+### Added
+
+- A test that reads every signature the document shows and compares it with the
+  one the code gives. A document that shows an output is showing a promise.
+- A test that the newest changelog entry is the version that ships, that no
+  version is written twice, that the versions run downwards and that no entry
+  is empty. Two edit scripts had replaced a heading that did not exist and
+  carried no check, so three entries were lost while the version kept moving.
+
 ## [0.14.0] - 2026-08-19
 
 A third review with no list of past findings. Both of its findings are real and

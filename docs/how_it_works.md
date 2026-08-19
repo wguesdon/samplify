@@ -234,8 +234,9 @@ stand before it, so that `control+_batch1` and `control_batch1+` are two names.
 The numbers keep the first places of the signature and their positions never
 move, because the near-miss search reads a number by its position. `rules.IDENTITY_SIGNS` holds the
 plus and the prime, and a hyphen counts as a sign wherever it does not separate
-two alphanumeric characters. The signature of `ovtoko_dox+_br1` is `("1", "+")`
-and the signature of `ovtoko_dox-_br1` is `("1", "-")`.
+two alphanumeric characters. Each sign also records how many numbers stand
+before it, so the signature of `ovtoko_dox+_br1` is `("1", "0+")` and the
+signature of `ovtoko_dox-_br1` is `("1", "0-")`.
 
 The rule has two effects. It keeps `p111` and `p112` in separate groups at every
 threshold. It also reduces the number of comparisons, because samplify measures
@@ -578,7 +579,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 525 offline tests, no key and no server
+uv run pytest                 # 526 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
