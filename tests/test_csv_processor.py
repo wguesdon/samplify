@@ -1303,3 +1303,26 @@ def test_the_file_decides_how_a_line_ends(tmp_path, content, ending):
     if ending == b"\r\n":
         # The newline inside the quoted value is part of that value.
         assert b'"two\r\nlines"' in written
+
+
+def test_apply_opens_no_network_connection(tmp_path):
+    """The claim the whole design rests on, checked at the socket.
+
+    The tests around this one patch the harmoniser. This one forbids the
+    connection itself, so a call added anywhere under `apply` fails here.
+    """
+    import socket
+
+    mapping = propose_csv(EXAMPLE_DIR / "cohort_messy.csv", "sample_id", method="damerau")
+    mapping.accept_all()
+    mapping.mark_reviewed()
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("apply opened a network connection")
+
+    with patch.object(socket.socket, "connect", refuse), patch.object(
+        socket.socket, "connect_ex", refuse
+    ):
+        frame, log = apply_mapping(mapping, output_path=tmp_path / "out.csv")
+
+    assert log["summary"]["total_rows"] == len(frame)
