@@ -37,6 +37,8 @@ IDENTITY_SIGNS = (
     "\u2019"  # RIGHT SINGLE QUOTATION MARK, which a word processor makes of '
     "\u00b1"  # PLUS-MINUS SIGN
     "\uff0b"  # FULLWIDTH PLUS SIGN
+    "\u207a"  # SUPERSCRIPT PLUS SIGN, which is how a journal writes CD4+
+    "\u208a"  # SUBSCRIPT PLUS SIGN
 )
 
 #: Every character a keyboard, a word processor or a journal uses for a hyphen
@@ -52,6 +54,8 @@ HYPHENS = (
     "\u2015"  # HORIZONTAL BAR
     "\u2212"  # MINUS SIGN
     "\uff0d"  # FULLWIDTH HYPHEN-MINUS
+    "\u207b"  # SUPERSCRIPT MINUS, which is how a journal writes CD4-
+    "\u208b"  # SUBSCRIPT MINUS
 )
 
 #: Every spelling of one sign folds to one character before any reader sees the
@@ -65,6 +69,8 @@ _SIGN_FOLD = str.maketrans(
     {
         **{character: "-" for character in HYPHENS},
         "\uff0b": "+",  # FULLWIDTH PLUS SIGN
+        "\u207a": "+",  # SUPERSCRIPT PLUS SIGN
+        "\u208a": "+",  # SUBSCRIPT PLUS SIGN
         "\u2032": "'",  # PRIME
         "\u2019": "'",  # RIGHT SINGLE QUOTATION MARK
     }

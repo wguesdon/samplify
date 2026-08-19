@@ -133,7 +133,11 @@ def test_a_reported_pair_is_never_a_merged_pair(names):
 @given(names=st.lists(sample_names(), min_size=1, max_size=20))
 @settings(max_examples=120, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_apply_keeps_every_row_and_never_touches_the_source_column(names):
-    """The output holds the input, byte for byte, plus one new column."""
+    """The output holds every value of the input, plus one new column.
+
+    The quoting is the writer's. A value that needs no quote carries none, so
+    the comparison reads the values and not the bytes of the file.
+    """
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / "in.csv"
         with open(source, "w", newline="") as handle:
@@ -339,11 +343,12 @@ def test_the_output_holds_one_row_for_each_record_of_the_file(lines):
 
 @given(names=st.lists(sample_names(), min_size=1, max_size=12))
 @settings(max_examples=120, deadline=None, suppress_health_check=[HealthCheck.too_slow])
-def test_every_column_the_tool_does_not_write_survives_byte_for_byte(names):
+def test_every_value_of_a_column_the_tool_does_not_write_survives(names):
     """The promise the tool makes about the columns it never touches.
 
     A NUL byte cut a value short and a ragged row moved a whole column, and
-    both were silent.
+    both were silent. The comparison reads the values, because the quoting of
+    the file belongs to the writer.
     """
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / "in.csv"

@@ -129,8 +129,13 @@ mapping file then records `"reviewed": false`, and `apply` prints that value.
 
 A file that a spreadsheet on Windows wrote is cp1252 and not UTF-8. Name its
 encoding at the propose step with `--encoding cp1252`. The mapping file records
-the value, and `apply` reads and writes the same one, so no column that
-samplify leaves alone changes its bytes.
+the value, and `apply` reads and writes the same one, so no value of a column
+that samplify leaves alone changes.
+
+The writer decides the quoting. A value that holds the separator, a quote or a
+newline is quoted, and a value that needs no quote carries none, so the input
+`s1,"x"` is written as `s1,x`. The value is the same and the punctuation of the
+file is the writer's.
 
 ## The quality control figure
 

@@ -13,6 +13,36 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.18.0] - 2026-08-19
+
+The ninth review with no list of past findings reports one major item, and it
+is the case this tool exists for.
+
+### Fixed
+
+- A superscript sign is a sign. `CD4⁺_donor1` and `CD4⁻_donor1` merged into one
+  sample, because the superscript plus is a mathematical symbol and not a word
+  character, so normalisation deleted it and the identity signature never saw
+  it. A journal writes a population that way. The superscript and the subscript
+  forms of the plus and the minus now read as the ASCII ones.
+- An empty name is not canonical. The search for a forbidden character finds
+  nothing in an empty string, so `rules.is_canonical` answered yes about a name
+  that identifies nothing.
+
+### Changed
+
+- The promise about a column that samplify never writes names the value and not
+  the bytes. The writer decides the quoting, so the input `s1,"x"` is written as
+  `s1,x`, and the value is the same.
+- `docs/how_it_works.md` no longer states the number of offline tests. The
+  number went stale within one working session, and the reader learns nothing
+  from it.
+
+### Added
+
+- `apply` is tested with the socket refused, so a network call added anywhere
+  under it fails the suite.
+
 ## [0.17.0] - 2026-08-19
 
 The eighth review with no list of past findings reports one major item and two

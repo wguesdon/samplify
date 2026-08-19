@@ -1116,3 +1116,32 @@ def test_a_name_that_identifies_nothing_is_not_canonical(name):
 @pytest.mark.parametrize("name", ["sample_1", "s1", "1", "a_b_c_9"])
 def test_a_name_that_follows_the_rules_is_canonical(name):
     assert rules.is_canonical(name) is True
+
+
+@pytest.mark.parametrize(
+    "positive,negative",
+    [
+        ("CD4⁺_donor1", "CD4⁻_donor1"),   # the superscript forms a journal writes
+        ("CD4₊_donor1", "CD4₋_donor1"),   # the subscript forms
+    ],
+)
+def test_a_superscript_sign_separates_two_populations(positive, negative):
+    """`CD4⁺` and `CD4⁻` are two populations, and a journal writes them that way.
+
+    The superscript plus is a mathematical symbol and not a word character, so
+    normalisation deleted it and the identity signature never saw it. The two
+    names became one string and the rules path merged them with no distance
+    computed at all.
+    """
+    assert matching.digit_signature(positive) != matching.digit_signature(negative)
+    assert len(matching.group_names([positive, negative], method="rules")) == 2
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [("CD4⁺_donor1", "CD4+_donor1"), ("CD4⁻_donor1", "CD4-_donor1")],
+)
+def test_a_superscript_sign_is_the_sign_it_writes(left, right):
+    """One statement written in two typefaces is one statement."""
+    assert matching.digit_signature(left) == matching.digit_signature(right)
+    assert matching.group_names([left, right], method="rules") == [sorted([left, right])]

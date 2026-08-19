@@ -481,6 +481,11 @@ header `sample_id,other` with the row `s1,x,extra` produced the name `x` and
 the name `s1` was gone. A row that holds fewer values is read, because the
 reader fills the missing place and nothing the file held is lost.
 
+The writer decides the quoting. A value that holds the separator, a quote or a
+newline is quoted, and a value that needs no quote carries none, so the input
+`s1,"x"` is written as `s1,x`. The value is the same, and the punctuation of the
+file belongs to the writer.
+
 A repeated column name reaches the output as the file wrote it. pandas renames
 the second one, so a header of `sample_id,note,note` came out as
 `sample_id,note,note.1`. The names that the `csv` module read are the names of
@@ -670,7 +675,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 568 offline tests, no key and no server
+uv run pytest                 # the offline suite, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key
