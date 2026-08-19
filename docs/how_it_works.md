@@ -263,6 +263,14 @@ and `rules.IDENTITY_SIGNS` and `rules.HYPHENS` hold both. Only the ASCII forms
 were kept until version 0.12.0, so `WT2-1′` merged with `WT2-1` and
 `CD4−_donor1` merged with `CD4_donor1`.
 
+Holding both forms is only half of the rule. The identity signature read the
+raw character until version 0.15.0, so `CD4-` and `CD4−` carried two
+identities and never merged, and the sentence above was a promise the code did
+not keep. `rules.prepare` now folds every spelling of one sign to one
+character, before the token rule and the signature read the name. The
+plus-minus sign and the double prime stand for themselves and fold into
+nothing.
+
 The number sign is deliberately not a sign. In `#111_b2` it reads as the word
 number and it identifies nothing. The asterisk is absent for the same reason,
 because it marks a footnote more often than a sample.
@@ -454,6 +462,28 @@ samplify breaks a remaining tie in three steps.
 
 The result therefore never depends on the order of the input.
 
+## Reading the file
+
+Every column is read as text, and no value is treated as missing. The default
+reader infers a type per column, and both of its guesses destroy a sample name.
+It reads `007` as the number 7 and drops the padding, and it reads the name `NA`
+as a missing value and deletes it.
+
+A blank line is a row of the file, and the output holds one row for each row of
+the input. The default reader drops an empty line, so a file of three rows gave
+an output of two rows until version 0.14.2. A property test now reads the
+expected count with the `csv` module of the standard library and compares it
+against the count that `apply` wrote.
+
+The default encoding is `utf-8-sig`, which reads a file that a spreadsheet
+wrote and strips its byte order mark. A spreadsheet on Windows writes cp1252
+instead, and that file raised a decoding error that named a byte and no file.
+The option `--encoding` names the encoding, `propose` records it in the mapping
+file, and `apply` reads and writes the same one. samplify guesses no encoding,
+because the wrong guess changes a name and says nothing. A file read as
+`utf-8-sig` is written as `utf-8`, so a file that carried no byte order mark
+does not gain one.
+
 ## The guards
 
 The `apply` command refuses to run in each condition below. The list carries no
@@ -579,7 +609,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 533 offline tests, no key and no server
+uv run pytest                 # 548 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

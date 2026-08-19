@@ -10,6 +10,7 @@ the same input give the same output on any machine and on any day.
 
 from __future__ import annotations
 
+import codecs
 import json
 import os
 from dataclasses import dataclass, field
@@ -19,6 +20,11 @@ from typing import Any
 
 #: Bumped when the on-disk shape changes in a way an older reader cannot handle.
 SCHEMA_VERSION = 1
+
+#: The encoding samplify reads and writes unless a person names another one.
+#: utf-8-sig, because a spreadsheet writes a byte order mark and the plain
+#: utf-8 codec keeps it as a character at the front of the first column name.
+DEFAULT_ENCODING = "utf-8-sig"
 
 STATUS_PROPOSED = "proposed"
 STATUS_ACCEPTED = "accepted"
@@ -290,6 +296,7 @@ class MappingFile:
     diagnosis: dict[str, Any] = field(default_factory=dict)
     near_misses: list[list[str]] = field(default_factory=list)
     canonical_pattern: str = ""
+    encoding: str = DEFAULT_ENCODING
     schema_version: int = SCHEMA_VERSION
 
     #: Where this file was read from, when it was read from a file. It is set
@@ -409,6 +416,7 @@ class MappingFile:
             "provider": self.provider,
             "base_url": self.base_url,
             "canonical_pattern": self.canonical_pattern,
+            "encoding": self.encoding,
             "reviewed": self.reviewed,
             "reviewed_at": self.reviewed_at,
             "diagnosis": self.diagnosis,
@@ -474,6 +482,7 @@ class MappingFile:
         for field in (
             "input_file", "column", "model", "provider", "base_url",
             "canonical_pattern", "method", "created", "reviewed_at",
+            "encoding",
         ):
             value = data.get(field)
             if value is not None and not isinstance(value, str):
@@ -492,6 +501,17 @@ class MappingFile:
                     f"The 'near_misses' field holds {pair!r}. Every entry is a "
                     f"pair of names, and a name is text that holds a character."
                 )
+
+        # An encoding that no codec knows fails deep inside the reader, and
+        # the message names the codec and not this file.
+        encoding = str(data.get("encoding") or DEFAULT_ENCODING)
+        try:
+            codecs.lookup(encoding)
+        except LookupError as exc:
+            raise ValueError(
+                f"The 'encoding' field holds {encoding!r}, and Python knows no "
+                f"codec of that name. Use a name such as utf-8 or cp1252."
+            ) from exc
 
         reviewed = data.get("reviewed", False)
         if not isinstance(reviewed, bool):
@@ -527,6 +547,7 @@ class MappingFile:
             diagnosis=dict(data.get("diagnosis") or {}),
             near_misses=[list(p) for p in data.get("near_misses") or []],
             canonical_pattern=str(data.get("canonical_pattern", "")),
+            encoding=encoding,
             schema_version=int(version),
         )
 

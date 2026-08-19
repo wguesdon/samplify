@@ -1041,3 +1041,34 @@ def test_a_name_without_delimiters_is_not_that_shape():
     assert matching.group_names(["p1b1", "p1_b1"], method="damerau") == [
         ["p1_b1", "p1b1"]
     ]
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ("CD4-", "CD4−"),   # ASCII hyphen against the Unicode minus
+        ("CD4-", "CD4–"),   # against the en dash
+        ("CD4-", "CD4－"),   # against the fullwidth hyphen-minus
+        ("CD4+", "CD4＋"),   # ASCII plus against the fullwidth plus
+        ("WT2-1'", "WT2-1′"),   # apostrophe against the prime
+        ("WT2-1'", "WT2-1’"),   # against the right single quotation mark
+    ],
+)
+def test_one_sign_written_two_ways_is_one_sign(left, right):
+    """A sign is a sign in every typeface, and the identity says so.
+
+    The sign tables made each typographic form count as a sign, and the
+    signature then kept the raw character. `CD4-` and `CD4−` therefore held two
+    identities and never merged, which the documentation said they would.
+    """
+    assert matching.digit_signature(left) == matching.digit_signature(right)
+    assert matching.group_names([left, right], method="damerau") == [
+        sorted([left, right])
+    ]
+
+
+@pytest.mark.parametrize("sign", ["±", "″"])
+def test_a_sign_that_stands_for_itself_does_not_fold(sign):
+    """The plus-minus and the double prime are not spellings of another sign."""
+    assert matching.digit_signature(f"CD4{sign}") != matching.digit_signature("CD4-")
+    assert matching.digit_signature(f"CD4{sign}") != matching.digit_signature("CD4+")

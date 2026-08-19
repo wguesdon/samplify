@@ -54,6 +54,22 @@ HYPHENS = (
     "\uff0d"  # FULLWIDTH HYPHEN-MINUS
 )
 
+#: Every spelling of one sign folds to one character before any reader sees the
+#: name. The tables above make the typographic forms count as signs, and the
+#: identity signature then kept the raw character, so `CD4-` with the ASCII
+#: hyphen and `CD4−` with the Unicode minus held two identities and never
+#: merged. A sign is a sign in every typeface, and it is now written one way.
+#: The plus-minus sign and the double prime stand for themselves, so neither
+#: folds into another character.
+_SIGN_FOLD = str.maketrans(
+    {
+        **{character: "-" for character in HYPHENS},
+        "\uff0b": "+",  # FULLWIDTH PLUS SIGN
+        "\u2032": "'",  # PRIME
+        "\u2019": "'",  # RIGHT SINGLE QUOTATION MARK
+    }
+)
+
 #: A hyphen between two alphanumeric characters separates two tokens, as in
 #: ``s1-b1``. A hyphen in any other position is a sign that belongs to the
 #: token it touches, as in ``dox-``, which is the opposite of ``dox+``. Every
@@ -89,7 +105,8 @@ def prepare(name: str) -> str:
         name: A raw sample name.
 
     Returns:
-        The name in lower case, with each separating hyphen replaced by
+        The name in lower case, with every spelling of a sign folded to one
+        character and each separating hyphen replaced by
         :data:`CANONICAL_DELIMITER`.
 
     Example:
@@ -97,8 +114,12 @@ def prepare(name: str) -> str:
         's1_b1'
         >>> prepare("OVTOKO_DOX-_br1")
         'ovtoko_dox-_br1'
+        >>> prepare("CD4\u2212") == prepare("CD4-")
+        True
     """
-    return _SEPARATING_HYPHEN.sub(CANONICAL_DELIMITER, name.lower())
+    return _SEPARATING_HYPHEN.sub(
+        CANONICAL_DELIMITER, name.lower().translate(_SIGN_FOLD)
+    )
 
 
 @dataclass(frozen=True)

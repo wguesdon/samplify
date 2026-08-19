@@ -39,6 +39,7 @@ from .harmonizer import (
     resolve_base_url,
 )
 from .mapping import (
+    DEFAULT_ENCODING,
     STATUS_ACCEPTED,
     STATUS_EDITED,
     STATUS_REJECTED,
@@ -268,6 +269,7 @@ def _run_propose(args: argparse.Namespace) -> int:
             provider=args.provider,
             base_url=args.base_url,
             timeout=args.timeout,
+            encoding=args.encoding,
         )
     except (ValueError, FileNotFoundError) as exc:
         _print_error(exc)
@@ -666,6 +668,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     propose_parser.add_argument(
         "--plot", default=None, metavar="PATH", help="Also write the QC figure here."
+    )
+    propose_parser.add_argument(
+        "--encoding",
+        default=DEFAULT_ENCODING,
+        help=(
+            "The character encoding of the CSV (default: utf-8-sig). A "
+            "spreadsheet on Windows writes cp1252. The mapping records the "
+            "value, and apply reads and writes the same one."
+        ),
     )
 
     plot_parser = subparsers.add_parser(

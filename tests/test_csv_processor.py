@@ -1004,3 +1004,84 @@ def test_a_file_that_cannot_be_parsed_names_itself_and_the_cause(tmp_path):
     message = str(error.value)
     assert "broken.csv" in message
     assert "quote" in message
+
+
+def test_a_file_that_is_not_utf8_names_itself_and_the_option(tmp_path):
+    """A spreadsheet on Windows writes cp1252, and the reader said only that.
+
+    The message named a codec and a byte position, and no file and no way out.
+    """
+    source = tmp_path / "windows.csv"
+    source.write_bytes(b"sample_id,note\nsample_1,caf\xe9\nsample_2,x\n")
+
+    with pytest.raises(ValueError) as error:
+        propose_csv(source, "sample_id", method="damerau")
+
+    message = str(error.value)
+    assert "windows.csv" in message
+    assert "cp1252" in message
+
+
+def test_the_encoding_of_the_input_is_the_encoding_of_the_output(tmp_path):
+    """apply reads and writes one encoding, so no column it left alone changes."""
+    source = tmp_path / "windows.csv"
+    source.write_bytes(b"sample_id,note\nsample_1,caf\xe9\nsample-1,x\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau", encoding="cp1252")
+    assert mapping.encoding == "cp1252"
+    mapping.accept_all()
+
+    output = tmp_path / "out.csv"
+    apply_mapping(mapping, output_path=output)
+
+    written = output.read_bytes()
+    assert b"caf\xe9" in written
+    assert "café" in output.read_text(encoding="cp1252")
+
+
+def test_the_encoding_survives_the_round_trip_through_the_mapping_file(tmp_path):
+    """review writes the file and apply reads it, so the value must persist."""
+    from samplify import mapping as mapping_module
+
+    source = tmp_path / "windows.csv"
+    source.write_bytes(b"sample_id\nsample_1\nsample-1\n")
+
+    proposed = propose_csv(source, "sample_id", method="damerau", encoding="cp1252")
+    proposed.accept_all()
+    path = tmp_path / "mapping.json"
+    mapping_module.write(proposed, path)
+
+    read_back = mapping_module.read(path)
+    assert read_back.encoding == "cp1252"
+
+
+def test_a_mapping_file_naming_an_unknown_codec_is_refused(tmp_path):
+    """The failure otherwise happened inside the reader and named no field."""
+    from samplify import mapping as mapping_module
+
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nsample_1\n")
+    proposed = propose_csv(source, "sample_id", method="damerau")
+    proposed.accept_all()
+    path = tmp_path / "mapping.json"
+    mapping_module.write(proposed, path)
+
+    document = json.loads(path.read_text())
+    document["encoding"] = "not-a-codec"
+    path.write_text(json.dumps(document))
+
+    with pytest.raises(ValueError, match="codec"):
+        mapping_module.read(path)
+
+
+def test_a_file_read_as_utf8_sig_is_not_written_with_a_byte_order_mark(tmp_path):
+    """utf-8-sig strips a mark when it reads and adds one when it writes."""
+    source = tmp_path / "plain.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n", encoding="utf-8")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    output = tmp_path / "out.csv"
+    apply_mapping(mapping, output_path=output)
+
+    assert not output.read_bytes().startswith(b"\xef\xbb\xbf")

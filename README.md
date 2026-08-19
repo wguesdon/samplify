@@ -127,6 +127,11 @@ result.
 A pipeline can accept every proposal at the propose step with `--yes`. The
 mapping file then records `"reviewed": false`, and `apply` prints that value.
 
+A file that a spreadsheet on Windows wrote is cp1252 and not UTF-8. Name its
+encoding at the propose step with `--encoding cp1252`. The mapping file records
+the value, and `apply` reads and writes the same one, so no column that
+samplify leaves alone changes its bytes.
+
 ## The quality control figure
 
 ```bash

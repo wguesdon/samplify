@@ -21,7 +21,7 @@ import pandas as pd
 
 from . import matching, rules
 from .harmonizer import DEFAULT_PROVIDER, harmonize, resolve_base_url, resolve_model
-from .mapping import Group, MappingFile
+from .mapping import DEFAULT_ENCODING, Group, MappingFile
 
 
 def is_the_same_file(destination: str | os.PathLike, source: str | os.PathLike) -> bool:
@@ -49,7 +49,41 @@ def is_the_same_file(destination: str | os.PathLike, source: str | os.PathLike) 
     return destination.resolve() == source.resolve()
 
 
-def _read_csv(path: Path, column: str) -> pd.DataFrame:
+def _writing_codec(encoding: str) -> str:
+    """Return the codec that writes a file read in this encoding.
+
+    Args:
+        encoding: The encoding the file was read in.
+
+    Returns:
+        The encoding to write with. utf-8-sig strips a byte order mark when it
+        reads, and it adds one when it writes, so a file that had none would
+        gain one.
+    """
+    return "utf-8" if encoding.lower().replace("_", "-") == "utf-8-sig" else encoding
+
+
+def _the_encoding_is_wrong(path: Path, encoding: str, exc: UnicodeDecodeError) -> str:
+    """Explain a failure to decode a file, and name a way out.
+
+    Args:
+        path: The file that failed to decode.
+        encoding: The encoding that was tried.
+        exc: The error the decoder raised.
+
+    Returns:
+        The message for the ValueError that replaces the decoding error.
+    """
+    return (
+        f"{path} is not text in {encoding}. Byte {exc.object[exc.start]:#04x} at "
+        f"position {exc.start} is not valid. A spreadsheet on Windows writes "
+        f"cp1252 and not UTF-8, so pass --encoding cp1252, or save the file "
+        f"again as UTF-8. samplify does not guess an encoding, because the "
+        f"wrong guess changes a name without saying so."
+    )
+
+
+def _read_csv(path: Path, column: str, encoding: str = DEFAULT_ENCODING) -> pd.DataFrame:
     """Read a CSV without letting pandas reinterpret an identifier.
 
     The default reader infers a type per column, and both of its guesses
@@ -60,12 +94,14 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
     Args:
         path: The CSV to read.
         column: The column of sample names, checked for a duplicate.
+        encoding: The character encoding of the file.
 
     Returns:
         The whole file as text.
 
     Raises:
-        ValueError: If the column is absent, or if the header holds it twice.
+        ValueError: If the column is absent, if the header holds it twice, if
+            the file cannot be parsed, or if it is not in this encoding.
     """
     # utf-8-sig, because pandas strips a byte order mark and the default
     # encoding does not. A file that Excel wrote starts with one, and the two
@@ -73,8 +109,11 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
     # "\ufeffsample_id" and pandas saw "sample_id". The duplicate check below
     # read the wrong name and passed a file that holds the column twice.
     header: list[str] = []
-    with open(path, newline="", encoding="utf-8-sig") as fh:
-        header = next(csv.reader(fh), [])
+    try:
+        with open(path, newline="", encoding=encoding) as fh:
+            header = next(csv.reader(fh), [])
+    except UnicodeDecodeError as exc:
+        raise ValueError(_the_encoding_is_wrong(path, encoding, exc)) from exc
     if header.count(column) > 1:
         raise ValueError(
             f"Column {column!r} appears {header.count(column)} times in {path}. "
@@ -92,7 +131,10 @@ def _read_csv(path: Path, column: str) -> pd.DataFrame:
             keep_default_na=False,
             na_filter=False,
             skip_blank_lines=False,
+            encoding=encoding,
         )
+    except UnicodeDecodeError as exc:
+        raise ValueError(_the_encoding_is_wrong(path, encoding, exc)) from exc
     except pd.errors.ParserError as exc:
         # The reader raises on a file it cannot parse, and its message names no
         # file. An opening quote with no closing one is the usual cause, and it
@@ -523,6 +565,7 @@ def propose_csv(
     provider: str = DEFAULT_PROVIDER,
     base_url: str | None = None,
     timeout: float | None = None,
+    encoding: str = DEFAULT_ENCODING,
 ) -> MappingFile:
     """Read a CSV column and propose a mapping for the names in it.
 
@@ -536,17 +579,20 @@ def propose_csv(
         provider: ``"openrouter"`` or ``"ollama"``.
         base_url: The server to call.
         timeout: Seconds to wait for the answer.
+        encoding: The character encoding of the CSV. It is recorded in the
+            mapping, so that ``apply`` reads and writes the same one.
 
     Returns:
         A mapping file with every group still marked ``proposed``, carrying the
-        input path and the column so that ``apply`` needs neither again.
+        input path, the column and the encoding so that ``apply`` needs none of
+        them again.
 
     Raises:
         FileNotFoundError: If the CSV does not exist.
         ValueError: If the column is not in the CSV.
     """
     path = Path(path)
-    df = _read_csv(path, column)
+    df = _read_csv(path, column, encoding)
 
     # An empty cell is not a sample name. It carries no identity, and a group
     # built from it would rename a row to nothing.
@@ -566,6 +612,7 @@ def propose_csv(
     )
     result.input_file = str(path.resolve())
     result.column = column
+    result.encoding = encoding
     return result
 
 
@@ -641,7 +688,7 @@ def apply_mapping(
         )
 
     path = Path(resolved_data)
-    df = _read_csv(path, resolved_column)
+    df = _read_csv(path, resolved_column, mapping.encoding)
 
     # The mapping was built from one column of one file. Applying it to a file
     # that shares no name with it changes nothing, and the log still reports
@@ -777,7 +824,12 @@ def apply_mapping(
             )
 
     if output_path is not None:
-        df.to_csv(output_path, index=False)
+        # The output carries the encoding of the input. Reading cp1252 and
+        # writing UTF-8 changes the bytes of every column samplify was asked
+        # not to touch. utf-8-sig is a reading name here: it strips the byte
+        # order mark, and writing it back would put one in a file that had
+        # none, so the plain codec writes.
+        df.to_csv(output_path, index=False, encoding=_writing_codec(mapping.encoding))
     if json_log_path is not None:
         import json
 

@@ -167,6 +167,45 @@ def test_a_directory_alias_of_the_input_is_the_input(tmp_path, capsys):
     assert data.read_bytes() == before
 
 
+def _is_os_replace(node) -> bool:
+    """Report whether a call is ``os.replace`` and not ``str.replace``.
+
+    Args:
+        node: The ast.Call node.
+
+    Returns:
+        True when the call renames a file.
+    """
+    import ast
+
+    return (
+        isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "os"
+    )
+
+
+def _opens_for_writing(node) -> bool:
+    """Report whether an ``open`` call would create or change a file.
+
+    Args:
+        node: The ast.Call node.
+
+    Returns:
+        True when the mode holds w, a or x.
+    """
+    import ast
+
+    modes = [a for a in node.args[1:2] if isinstance(a, ast.Constant)]
+    modes += [
+        k.value for k in node.keywords
+        if k.arg == "mode" and isinstance(k.value, ast.Constant)
+    ]
+    return any(
+        isinstance(m.value, str) and set(m.value) & set("wax") for m in modes
+    )
+
+
 def test_every_call_that_writes_a_file_has_a_guarded_destination():
     """An inventory, so that a new write cannot be added without one.
 
@@ -185,10 +224,15 @@ def test_every_call_that_writes_a_file_has_a_guarded_destination():
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
-            if name in ("to_csv", "savefig", "replace") or (
-                name == "open" and len(node.args) > 1
-            ):
+            if name in ("to_csv", "savefig"):
                 found.append(f"{module.name}:{name}")
+            elif name == "replace" and _is_os_replace(node):
+                # Only os.replace puts a file in place. str.replace is a string
+                # method, and counting it made this inventory fail whenever a
+                # message was edited.
+                found.append(f"{module.name}:replace")
+            elif name == "open" and _opens_for_writing(node):
+                found.append(f"{module.name}:open")
 
     assert sorted(found) == sorted([
         "csv_processor.py:to_csv",   # the output CSV

@@ -13,6 +13,35 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.15.0] - 2026-08-19
+
+The sixth review with no list of past findings reports no major item. Its one
+finding is the sign that two typefaces write two ways.
+
+### Added
+
+- The option `--encoding` names the character encoding of the CSV. A spreadsheet
+  on Windows writes cp1252, and that file raised a decoding error that named a
+  byte and no file. `propose` records the value in the mapping file, and `apply`
+  reads and writes the same one, so no column that samplify leaves alone changes
+  its bytes. A file read as `utf-8-sig` is written as `utf-8`, so a file that
+  carried no byte order mark does not gain one. samplify guesses no encoding,
+  because the wrong guess changes a name and says nothing.
+
+### Fixed
+
+- One sign written two ways is one sign. `rules.IDENTITY_SIGNS` and
+  `rules.HYPHENS` made the typographic forms count, and the identity signature
+  then kept the raw character, so `CD4-` and `CD4−` carried two identities and
+  never merged. `rules.prepare` folds every spelling to one character before the
+  token rule and the signature read the name. The plus-minus sign and the double
+  prime stand for themselves and fold into nothing.
+- A CSV that cannot be parsed names itself. An unclosed quote raised a pandas
+  error that named no file and no cause.
+- The inventory of every call that writes a file reads `os.replace` and an
+  `open` in a writing mode. It counted `str.replace` as well, so editing a
+  message made the test fail.
+
 ## [0.14.2] - 2026-08-19
 
 The fifth review with no list of past findings. Its one finding loses a row.
