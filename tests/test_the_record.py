@@ -9,7 +9,6 @@ decide whether to upgrade, so it is checked here like any other output.
 from __future__ import annotations
 
 import re
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,8 +17,15 @@ VERSIONS = re.findall(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\]", CHANGELOG, re.M)
 
 
 def _declared_version() -> str:
-    with open(ROOT / "pyproject.toml", "rb") as handle:
-        return tomllib.load(handle)["project"]["version"]
+    """Read the version from pyproject.toml.
+
+    A regex rather than tomllib, because tomllib arrived in Python 3.11 and
+    this package supports 3.10.
+    """
+    text = (ROOT / "pyproject.toml").read_text()
+    found = re.search(r'^version = "([^"]+)"', text, re.M)
+    assert found, "pyproject.toml holds no version"
+    return found.group(1)
 
 
 def test_the_newest_entry_is_the_version_that_ships():
