@@ -281,3 +281,20 @@ def test_no_model_answer_loses_a_name_or_mixes_two_identities(names, method, mer
         for index, left in enumerate(group.members):
             for right in group.members[index + 1:]:
                 assert matching.describe_difference(left, right) != "substitution"
+
+
+@given(names=name_lists, method=st.sampled_from(matching.OFFLINE_METHODS))
+@settings(max_examples=250, deadline=None)
+def test_no_group_joins_two_names_where_one_gained_a_token(names, method):
+    """No keystroke adds a token, so no group may hold that pair.
+
+    A group formed by the normalisation rules is exempt, because those two
+    names reduce to one string and the tokens are the same information written
+    two ways.
+    """
+    for group in matching.group_names(names, method=method):
+        for index, left in enumerate(group):
+            for right in group[index + 1:]:
+                if matching.rule_normalise(left) == matching.rule_normalise(right):
+                    continue
+                assert not matching._one_name_gained_a_token(left, right), (left, right)
