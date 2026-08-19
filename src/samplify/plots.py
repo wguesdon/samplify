@@ -59,6 +59,22 @@ def _require_matplotlib() -> Any:
     return plt
 
 
+def supported_figure_formats() -> frozenset[str]:
+    """Return the file formats matplotlib can write on this machine.
+
+    The set depends on the backend and on what is installed, so it is read from
+    matplotlib rather than written down here.
+
+    Returns:
+        The extensions, without the dot and in lower case.
+
+    Raises:
+        ImportError: If matplotlib is not installed.
+    """
+    plt = _require_matplotlib()
+    return frozenset(plt.figure().canvas.get_supported_filetypes())
+
+
 def _shorten(label: str) -> str:
     """Trim a name so that it fits on an axis.
 

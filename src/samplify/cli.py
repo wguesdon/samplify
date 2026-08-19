@@ -258,6 +258,22 @@ def _run_propose(args: argparse.Namespace) -> int:
                 f"none of them."
             )
             return 1
+        if Path(destination).is_dir():
+            _print_error(
+                f"{label} names {destination}, which is a directory. Give the "
+                f"path of a file. samplify writes all of its files or none of "
+                f"them."
+            )
+            return 1
+
+    # The format of the figure is checked here and not at the draw, which runs
+    # after the mapping file is written. `--plot qc.unsupported` wrote the
+    # mapping and then failed, and the command had one of its files on disk.
+    if args.plot:
+        refusal = _refuse_a_format_no_figure_can_take(args.plot)
+        if refusal is not None:
+            _print_error(refusal)
+            return 1
 
     try:
         result = propose_csv(
@@ -302,6 +318,33 @@ def _run_propose(args: argparse.Namespace) -> int:
 
 
 # ── plot ───────────────────────────────────────────────────────────────────
+
+
+def _refuse_a_format_no_figure_can_take(path: str) -> str | None:
+    """Report why a figure cannot be written to this path, before anything runs.
+
+    Args:
+        path: The path the figure would be written to.
+
+    Returns:
+        The message to print, or None when the format is one matplotlib writes.
+    """
+    try:
+        from .plots import supported_figure_formats
+
+        formats = supported_figure_formats()
+    except ImportError:
+        # matplotlib is an optional dependency. The draw reports its absence
+        # with the command that installs it, so nothing is refused here.
+        return None
+
+    suffix = Path(path).suffix.lstrip(".").lower()
+    if suffix in formats:
+        return None
+    return (
+        f"--plot names {path}, and matplotlib writes no {suffix or 'nameless'} "
+        f"file. Use one of: {', '.join(sorted(formats))}."
+    )
 
 
 def _write_plot(result: MappingFile, path: str, title: str | None = None, dpi: int = 150) -> int:

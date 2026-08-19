@@ -514,10 +514,18 @@ mapping renames `sample_1` to `sample1`, the second file already holds
 `sample1`, and both rows then read `sample1` although no person put the two
 names in one group.
 
-samplify reports this and does not refuse it. A second file written in the
-canonical form is the usual reason, and refusing would stop a correct run. The
-count is in the summary of the log as `names_joined_without_a_decision`, the
-names are in the log as `joined_without_a_decision`, and `apply` prints them.
+The rule is the same as the one for a collision between two groups. A mapping
+that records `reviewed: false` is refused, because the names are in neither the
+mapping nor the review and the mapping carries no signature either. A reviewed
+mapping is allowed and reported, because a second file already written in the
+canonical form is the usual reason to see this. The count is in the summary of
+the log as `names_joined_without_a_decision`, the names are in the log as
+`joined_without_a_decision`, and `apply` prints them.
+
+The summary of the log counts the unique names of the file. It counted the size
+of the mapping until version 0.17.0, so a run against a second file reported a
+number that the file does not hold. The size of the mapping is in the summary
+as `names_in_the_mapping`.
 
 ## The guards
 
@@ -644,7 +652,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 560 offline tests, no key and no server
+uv run pytest                 # 564 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

@@ -13,6 +13,33 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.17.0] - 2026-08-19
+
+The eighth review with no list of past findings reports one major item and two
+medium items.
+
+### Fixed
+
+- `apply` refuses a name of the data file that the mapping never saw and that
+  already equals a name the mapping produces, when the mapping records
+  `reviewed: false`. Those rows join a group that no person put them in, and
+  the rule is now the one that already governs a collision between two groups.
+  A reviewed mapping is allowed and reported.
+- The summary of the log counts the unique names of the file. It counted the
+  size of the mapping, so a run against a second file reported a number that the
+  file does not hold. The size of the mapping is in the summary as
+  `names_in_the_mapping`.
+- `propose --plot` checks the format of the figure before it writes the mapping
+  file. `--plot qc.unsupported` wrote the mapping and then failed at the draw,
+  which contradicts the promise that samplify writes all of its files or none of
+  them. A destination that is a directory is refused there as well.
+- The header of a CSV is checked for a NUL byte, and not only the rows. The
+  reader ends a column name at that byte, so the column the caller asked for is
+  not the one it found.
+- A message about a row names the line a person sees in an editor. It named the
+  number of the row, and a value that holds a newline makes one row of two
+  lines.
+
 ## [0.16.0] - 2026-08-19
 
 The seventh review with no list of past findings reports four major items and

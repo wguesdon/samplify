@@ -1151,8 +1151,8 @@ def test_a_name_that_already_carries_a_canonical_name_is_reported(tmp_path):
 
     The mapping renames `sample_1` to `sample1`, and the second file already
     holds `sample1`. Both rows then read `sample1` although no person put the
-    two names in one group. It is reported and not refused, because a file
-    already written in the canonical form is the usual reason.
+    two names in one group. A reviewed mapping is reported and not refused,
+    because a file already written in the canonical form is the usual reason.
     """
     source = tmp_path / "first.csv"
     source.write_text("sample_id\nsample_1\nsample-1\n")
@@ -1161,11 +1161,54 @@ def test_a_name_that_already_carries_a_canonical_name_is_reported(tmp_path):
 
     mapping = propose_csv(source, "sample_id", method="damerau")
     mapping.accept_all()
+    mapping.mark_reviewed()
     frame, log = apply_mapping(mapping, data_path=second)
 
     assert log["joined_without_a_decision"] == ["sample1"]
     assert log["summary"]["names_joined_without_a_decision"] == 1
     assert list(frame["sample_id_canonical"]) == ["sample1", "sample1", "other_9"]
+
+
+def test_a_name_that_joins_a_group_is_refused_when_no_person_reviewed(tmp_path):
+    """Two unchecked things would otherwise meet in one output.
+
+    The names are in neither the mapping nor the review, and the mapping
+    carries no signature either.
+    """
+    source = tmp_path / "first.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n")
+    second = tmp_path / "second.csv"
+    second.write_text("sample_id\nsample_1\nsample1\nother_9\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+
+    with pytest.raises(ValueError) as error:
+        apply_mapping(mapping, data_path=second)
+
+    assert "sample1" in str(error.value)
+    assert "reviewed=False" in str(error.value)
+
+
+def test_the_unique_name_count_is_the_count_of_the_file(tmp_path):
+    """A person reads it against the row count, so it reads the file.
+
+    It reported the size of the mapping, so a run against a second file gave a
+    count the file does not hold.
+    """
+    source = tmp_path / "first.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n")
+    second = tmp_path / "second.csv"
+    second.write_text("sample_id\nsample_1\nsample1\nother_9\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    mapping.mark_reviewed()
+    _, log = apply_mapping(mapping, data_path=second)
+
+    assert log["summary"]["total_rows"] == 3
+    assert log["summary"]["unique_names"] == 3
+    assert log["summary"]["names_in_the_mapping"] == 2
 
 
 def test_nothing_is_reported_when_the_data_holds_no_such_name(tmp_path):

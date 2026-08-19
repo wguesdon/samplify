@@ -856,13 +856,31 @@ def apply_mapping(
         for name in set(df[resolved_column])
         if name not in final_mapping and name in produced
     )
+    # The same rule as the collision guard above. A mapping that no person
+    # reviewed carries no signature, and these names were in neither the
+    # mapping nor the review, so two unchecked things would meet in the output.
+    # A reviewed mapping is allowed through and reported, because a second file
+    # already written in the canonical form is the usual reason to see this.
+    if joined_without_a_decision and mapping.reviewed is not True:
+        shown = ", ".join(repr(name) for name in joined_without_a_decision[:5])
+        raise ValueError(
+            f"{len(joined_without_a_decision)} name(s) of {path} already carry "
+            f"a name that this mapping produces: {shown}. Those rows would join "
+            f"a group that no person put them in, and this mapping records "
+            f"reviewed={mapping.reviewed!r}. Run 'samplify propose' on this "
+            f"file, or review the mapping and run this again."
+        )
 
     names_changed = sum(1 for c in changes if c["changed"])
     summary = mapping.summary()
     summary.update(
         {
             "total_rows": len(df),
-            "unique_names": len(changes),
+            # The unique names of the file, which is what a person compares
+            # against the row count. It read the size of the mapping, so a run
+            # against a second file reported a count the file does not hold.
+            "unique_names": int(df[resolved_column].nunique()),
+            "names_in_the_mapping": len(changes),
             "names_changed": names_changed,
             "names_unchanged": len(changes) - names_changed,
             # The count of rows, which is what a person checks against the
