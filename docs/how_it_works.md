@@ -572,10 +572,19 @@ count, because a count goes stale and a list does not.
 10. A group holds a field that cannot decide a name. `Group.validate` holds
    every one of those checks, and both the file reader and a caller that builds
    a group in Python call it.
+11. A row of the CSV holds more values than the header, or any value holds a
+   NUL byte. Both lose data in silence, and the message names the line.
+12. A name of the data file that the mapping never saw already equals a name the
+   mapping produces, and the mapping records `reviewed: false`.
+13. A destination is a directory, or it points into a directory that does not
+   exist.
 
 A command writes all of its files or none of them. Every destination is
 checked before the first one is written, so an exit code of 1 means that
-nothing was written. `apply` writes three files and `propose` writes two.
+nothing was written. `apply` writes three files and `propose` writes two. The
+check covers the format of the figure as well, because matplotlib decides what
+it can write and it decides that at the draw, which runs after the mapping file
+is on disk.
 
 samplify merges the names inside one group, and that is not a collision. That
 operation is the purpose of the tool.
