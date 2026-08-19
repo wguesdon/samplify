@@ -229,14 +229,20 @@ letter, so the signature of `p1b1` is `("1", "1")` and it agrees with the
 signature of `p1_b1`. The compact form and the delimited form of one name reach
 the same block for that reason.
 
-A sign joins the signature after the numbers, and it records how many numbers
-stand before it, so that `control+_batch1` and `control_batch1+` are two names.
-The numbers keep the first places of the signature and their positions never
-move, because the near-miss search reads a number by its position. `rules.IDENTITY_SIGNS` holds the
-plus and the prime, and a hyphen counts as a sign wherever it does not separate
-two alphanumeric characters. Each sign also records how many numbers stand
-before it, so the signature of `ovtoko_dox+_br1` is `("1", "0+")` and the
-signature of `ovtoko_dox-_br1` is `("1", "0-")`.
+A sign joins the signature after the numbers. The numbers keep the first places
+of the signature and their positions never move, because the near-miss search
+reads a number by its position. `rules.IDENTITY_SIGNS` holds the plus and the
+prime, and a hyphen counts as a sign wherever it does not separate two
+alphanumeric characters.
+
+Each sign records two facts. The first is how many numbers stand before it, so
+that `control+_batch1` and `control_batch1+` are two names. The second is the
+word the sign touches, because `control+` and `batch+` are two statements about
+a sample, and the count of numbers alone read `control+_batch1` and
+`control_batch+1` as one name. The word passes through the abbreviation table
+first, so that `ctrl+` and `control+` still agree. The signature of
+`ovtoko_dox+_br1` is therefore `("1", "0dox+")` and the signature of
+`ovtoko_dox-_br1` is `("1", "0dox-")`.
 
 The rule has two effects. It keeps `p111` and `p112` in separate groups at every
 threshold. It also reduces the number of comparisons, because samplify measures
@@ -469,6 +475,16 @@ reader infers a type per column, and both of its guesses destroy a sample name.
 It reads `007` as the number 7 and drops the padding, and it reads the name `NA`
 as a missing value and deletes it.
 
+A row that holds more values than the header is refused, and the message names
+the line. pandas reads the first column of that file as a row label, so the
+header `sample_id,other` with the row `s1,x,extra` produced the name `x` and
+the name `s1` was gone. A row that holds fewer values is read, because the
+reader fills the missing place and nothing the file held is lost.
+
+A NUL byte in any column is refused. The reader that pandas uses ends a value
+at that byte and reports nothing, so a column samplify never touches would
+reach the output cut short.
+
 A blank line is a row of the file, and the output holds one row for each row of
 the input. The default reader drops an empty line, so a file of three rows gave
 an output of two rows until version 0.14.2. A property test now reads the
@@ -615,7 +631,7 @@ df, log = apply_mapping(mapping, output_path="clean.csv")
 ## Testing
 
 ```bash
-uv run pytest                 # 551 offline tests, no key and no server
+uv run pytest                 # 558 offline tests, no key and no server
 ./tests/smoke_test.sh         # the command line end to end, no key
 uv run pytest -m local        # the local model, needs a running ollama
 uv run pytest -m live         # the hosted model, needs an OpenRouter key

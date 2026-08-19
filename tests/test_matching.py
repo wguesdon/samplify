@@ -537,10 +537,11 @@ def test_a_hyphen_between_two_characters_separates_two_tokens():
 def test_a_hyphen_in_any_other_position_is_a_sign():
     """dox- is the uninduced arm and dox+ is the induced one."""
     assert rules.prepare("OVTOKO_DOX-_br1") == "ovtoko_dox-_br1"
-    # A sign carries the count of numbers that stand before it, so that
-    # `control+_batch1` and `control_batch1+` differ.
-    assert matching.digit_signature("OVTOKO_DOX-_br1") == ("1", "0-")
-    assert matching.digit_signature("OVTOKO_DOX+_br1") == ("1", "0+")
+    # A sign carries the count of numbers that stand before it and the word it
+    # touches, so that `control+_batch1`, `control_batch1+` and
+    # `control_batch+1` all differ.
+    assert matching.digit_signature("OVTOKO_DOX-_br1") == ("1", "0dox-")
+    assert matching.digit_signature("OVTOKO_DOX+_br1") == ("1", "0dox+")
     assert matching.group_names(
         ["OVTOKO_DOX+_br1", "OVTOKO_DOX-_br1"], method="damerau"
     ) == [["OVTOKO_DOX+_br1"], ["OVTOKO_DOX-_br1"]]
@@ -762,7 +763,7 @@ def test_a_superscript_does_not_crash_the_near_miss_search():
     """
     assert "²".isdigit() and not "²".isdecimal()
     assert matching.find_near_misses(["sample²_1", "sample_1"]) == []
-    assert matching.digit_signature("sample²_1") == ("1", "0²")
+    assert matching.digit_signature("sample²_1") == ("1", "0sample²")
 
 
 def test_a_character_that_is_neither_a_letter_nor_a_digit_identifies_a_sample():
@@ -782,7 +783,7 @@ def test_a_combining_mark_identifies_a_sample():
     `sampleİ1` the same name as `sampleI1`. Two names that differ by a Greek
     letter already stay apart, so these have to as well."""
     assert "İ".lower() == "i̇"
-    assert matching.digit_signature("sampleİ1") == ("1", "0̇")
+    assert matching.digit_signature("sampleİ1") == ("1", "0samplei̇")
     assert matching.group_names(["sampleI1", "sampleİ1"], method="damerau") == [
         ["sampleI1"],
         ["sampleİ1"],
@@ -965,7 +966,7 @@ def test_a_sign_carries_its_position():
     """`control+_batch1` and `control_batch1+` are two names, and the signature
     said they were one. Each sign records how many numbers stand before it, and
     the numbers keep the first places so their positions never move."""
-    assert matching.digit_signature("control+_batch1") == ("1", "0+")
+    assert matching.digit_signature("control+_batch1") == ("1", "0control+")
     assert matching.digit_signature("control_batch1+") == ("1", "1+")
     assert len(matching.group_names(
         ["control+_batch1", "control_batch1+"], method="damerau"
@@ -1072,3 +1073,31 @@ def test_a_sign_that_stands_for_itself_does_not_fold(sign):
     """The plus-minus and the double prime are not spellings of another sign."""
     assert matching.digit_signature(f"CD4{sign}") != matching.digit_signature("CD4-")
     assert matching.digit_signature(f"CD4{sign}") != matching.digit_signature("CD4+")
+
+
+def test_a_sign_belongs_to_the_word_it_touches():
+    """`control+` and `batch+` are two statements, and the signature says so.
+
+    The entry held only the count of numbers before the sign, so
+    `control+_batch1` and `control_batch+1` both read `0+` and the two names
+    merged into one sample.
+    """
+    assert matching.digit_signature("control+_batch1") != matching.digit_signature(
+        "control_batch+1"
+    )
+    assert len(
+        matching.group_names(["control+_batch1", "control_batch+1"], method="damerau")
+    ) == 2
+
+
+def test_the_word_in_front_of_a_sign_is_read_through_the_abbreviation_table():
+    """`ctrl+` and `control+` make one statement, so the identity is one.
+
+    The word joins the signature expanded, because the raw word would make the
+    identity rule refuse a pair of names that the abbreviation table exists to
+    join.
+    """
+    assert matching.digit_signature("ctrl+_1") == matching.digit_signature("control+_1")
+    assert matching.digit_signature("ctrl_batch1") == matching.digit_signature(
+        "control_batch1"
+    )

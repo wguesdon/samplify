@@ -1085,3 +1085,62 @@ def test_a_file_read_as_utf8_sig_is_not_written_with_a_byte_order_mark(tmp_path)
     apply_mapping(mapping, output_path=output)
 
     assert not output.read_bytes().startswith(b"\xef\xbb\xbf")
+
+
+def test_a_row_with_more_values_than_the_header_is_refused(tmp_path):
+    """pandas reads the first column as a row label, and the name is gone.
+
+    The header `sample_id,other` with the row `s1,x,extra` produced the name
+    `x`, and `s1` had become the label of the row.
+    """
+    source = tmp_path / "ragged.csv"
+    source.write_text("sample_id,other\ns1,x,extra\n")
+
+    with pytest.raises(ValueError) as error:
+        propose_csv(source, "sample_id", method="damerau")
+
+    message = str(error.value)
+    assert "Line 2" in message
+    assert "3 values" in message
+
+
+def test_a_row_with_fewer_values_than_the_header_is_read(tmp_path):
+    """The reader fills the missing place, and nothing the file held is lost."""
+    source = tmp_path / "short.csv"
+    source.write_text("sample_id,other\ns1\ns2,x\n")
+
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+    frame, _ = apply_mapping(mapping)
+
+    assert list(frame["sample_id"]) == ["s1", "s2"]
+    assert list(frame["other"]) == ["", "x"]
+
+
+def test_a_nul_byte_in_any_column_is_refused(tmp_path):
+    """The reader ends a value at the NUL and says nothing.
+
+    A column samplify never touches reached the output cut short, which breaks
+    the one promise the tool makes about the columns it does not write.
+    """
+    source = tmp_path / "binary.csv"
+    source.write_bytes(b"sample_id,meta\ns1,a\x00b\n")
+
+    with pytest.raises(ValueError) as error:
+        propose_csv(source, "sample_id", method="damerau")
+
+    assert "NUL" in str(error.value)
+
+
+def test_no_file_is_written_when_a_destination_is_a_directory(tmp_path):
+    """The output CSV is written first, so a bad log path left it on disk."""
+    source = tmp_path / "in.csv"
+    source.write_text("sample_id\nsample_1\nsample-1\n")
+    mapping = propose_csv(source, "sample_id", method="damerau")
+    mapping.accept_all()
+
+    output = tmp_path / "out.csv"
+    with pytest.raises(ValueError, match="directory"):
+        apply_mapping(mapping, output_path=output, json_log_path=tmp_path)
+
+    assert not output.exists()

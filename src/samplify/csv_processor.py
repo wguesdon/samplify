@@ -83,6 +83,56 @@ def _the_encoding_is_wrong(path: Path, encoding: str, exc: UnicodeDecodeError) -
     )
 
 
+def _refuse_a_row_that_cannot_be_read(path: Path, header: list[str], reader: Any) -> None:
+    """Stop on a row that the reader cannot carry to the output unchanged.
+
+    Two shapes of row lose data, and both were silent. A row that holds more
+    values than the header made pandas read the first column as an index, so
+    `sample_id,other` with the row `s1,x,extra` produced the name `x` and the
+    name `s1` was gone. A row that holds a NUL byte was cut at that byte, so
+    `a\x00b` in a column samplify never touches reached the output as `a`.
+
+    A row that holds fewer values than the header is allowed. The reader fills
+    the missing places with an empty value, and nothing that the file held is
+    lost.
+
+    Args:
+        path: The file being read, named in the message.
+        header: The first row, which sets the number of columns.
+        reader: The csv reader, positioned after the header.
+
+    Raises:
+        ValueError: On a row that holds too many values, or a NUL byte.
+    """
+    if not header:
+        return
+    try:
+        for number, row in enumerate(reader, start=2):
+            if len(row) > len(header):
+                raise ValueError(
+                    f"Line {number} of {path} holds {len(row)} values and the "
+                    f"header holds {len(header)}. samplify stops here, because "
+                    f"the reader would drop a value or read the first column as "
+                    f"a row label, and either one loses data. Repair the line, "
+                    f"or quote the value that holds the separator."
+                )
+            # The reader that pandas uses ends a value at the first NUL byte,
+            # and it reports nothing. The csv module of the standard library
+            # keeps the byte, so the check runs here.
+            if any("\x00" in value for value in row):
+                raise ValueError(
+                    f"Line {number} of {path} holds a NUL byte. The reader ends "
+                    f"a value at that byte and says nothing, so a column that "
+                    f"samplify never touches would reach the output cut short. "
+                    f"The file is binary or damaged."
+                )
+    except csv.Error as exc:
+        raise ValueError(
+            f"{path} cannot be read as a CSV: {exc}. A NUL byte is the usual "
+            f"cause, and it means the file is binary or damaged."
+        ) from exc
+
+
 def _read_csv(path: Path, column: str, encoding: str = DEFAULT_ENCODING) -> pd.DataFrame:
     """Read a CSV without letting pandas reinterpret an identifier.
 
@@ -111,7 +161,9 @@ def _read_csv(path: Path, column: str, encoding: str = DEFAULT_ENCODING) -> pd.D
     header: list[str] = []
     try:
         with open(path, newline="", encoding=encoding) as fh:
-            header = next(csv.reader(fh), [])
+            reader = csv.reader(fh)
+            header = next(reader, [])
+            _refuse_a_row_that_cannot_be_read(path, header, reader)
     except UnicodeDecodeError as exc:
         raise ValueError(_the_encoding_is_wrong(path, encoding, exc)) from exc
     if header.count(column) > 1:
@@ -826,6 +878,15 @@ def apply_mapping(
             raise ValueError(
                 f"{label} points into {parent}, which is not a directory that "
                 f"exists. samplify writes all of its files or none of them."
+            )
+        # A destination that is itself a directory raises while the file is
+        # written, and the output CSV is written first. The command then
+        # reported IsADirectoryError with one of its files already on disk.
+        if Path(destination).is_dir():
+            raise ValueError(
+                f"{label} names {destination}, which is a directory. Give the "
+                f"path of a file. samplify writes all of its files or none of "
+                f"them."
             )
 
     if output_path is not None:

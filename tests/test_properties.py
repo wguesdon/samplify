@@ -335,3 +335,29 @@ def test_the_output_holds_one_row_for_each_record_of_the_file(lines):
 
         assert len(frame) == expected, (lines, len(frame), expected)
         assert log["summary"]["total_rows"] == expected
+
+
+@given(names=st.lists(sample_names(), min_size=1, max_size=12))
+@settings(max_examples=120, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+def test_every_column_the_tool_does_not_write_survives_byte_for_byte(names):
+    """The promise the tool makes about the columns it never touches.
+
+    A NUL byte cut a value short and a ragged row moved a whole column, and
+    both were silent.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "in.csv"
+        with open(source, "w", newline="") as handle:
+            writer = csv_module.writer(handle)
+            writer.writerow(["sample_id", "note", "n"])
+            for position, name in enumerate(names):
+                writer.writerow([name, f"a,b {name}", position])
+
+        mapping = propose_csv(source, "sample_id", method="damerau")
+        mapping.accept_all()
+        output = Path(directory) / "out.csv"
+        apply_mapping(mapping, output_path=output)
+
+        written = pd.read_csv(output, dtype=str, keep_default_na=False)
+        assert list(written["note"]) == [f"a,b {name}" for name in names]
+        assert list(written["n"]) == [str(i) for i in range(len(names))]

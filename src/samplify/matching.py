@@ -392,11 +392,9 @@ def digit_signature(name: str) -> tuple[str, ...]:
     # position of a number. The near-miss search reads a number by its position.
     #
     # A sign between two numbers is told from a sign after them, because each
-    # one records how many numbers stand before it. `cd4+_donor1` and
-    # `cd+4_donor1` still share a signature, since both hold one sign after no
-    # number, and of the 17683 names in the reference corpus that hold a sign,
-    # exactly one pair differs only in the order of its characters, and that
-    # pair moved a number rather than a sign.
+    # one records how many numbers stand before it. Of the 17683 names in the
+    # reference corpus that hold a sign, exactly one pair differs only in the
+    # order of its characters, and that pair moved a number rather than a sign.
     # A sign joins the signature, and so does any other character that the rules
     # can neither read nor safely drop. See
     # :func:`_identifies_but_cannot_be_read`.
@@ -405,17 +403,31 @@ def digit_signature(name: str) -> tuple[str, ...]:
     # `control+_batch1` and `control_batch1+` differ. The numbers keep the
     # first places of the signature and their positions never move, because the
     # near-miss search reads a number by its position.
+    #
+    # The count of numbers is not enough on its own. `control+_batch1` and
+    # `control_batch+1` both hold one sign after no number, so both read `0+`
+    # and the two names merged. A sign belongs to the word it touches, and
+    # `control+` and `batch+` are two different statements about a sample. The
+    # word in front of the sign therefore joins the entry, expanded through the
+    # abbreviation table so that `ctrl+` and `control+` still agree.
     runs = 0
     inside_a_number = False
+    letters: list[str] = []
     for character in lowered:
         if character.isdecimal():
             if not inside_a_number:
                 runs += 1
                 inside_a_number = True
+            letters = []
             continue
         inside_a_number = False
         if character in _SIGN_CHARACTERS or _identifies_but_cannot_be_read(character):
-            signature.append(f"{runs}{character}")
+            signature.append(f"{runs}{_expand_token(''.join(letters))}{character}")
+            letters = []
+        elif character.isalpha():
+            letters.append(character)
+        else:
+            letters = []
 
     return tuple(signature)
 
@@ -603,6 +615,35 @@ class _UnionFind:
         return [sorted(members) for _, members in sorted(buckets.items())]
 
 
+def _a_token_is_substituted(a: str, b: str) -> bool:
+    """Report whether one token of two aligned names differs by a substitution.
+
+    :func:`describe_difference` reads the whole pair, and it reads one token
+    only when that token is the only one that differs. A model merged
+    ``Primary B cells1`` with ``Primary T cellss1``, where two tokens differ:
+    the second is a substitution of ``b`` by ``t``, and the third gained a
+    letter. The pair read as unrelated, and the substitution rule never saw the
+    token that carries the meaning. B cells and T cells are two cell types.
+
+    The two names must hold the same number of tokens. Nothing aligns
+    otherwise, so no token pair can be read.
+
+    Args:
+        a: The first name.
+        b: The second name.
+
+    Returns:
+        True when one aligned pair of tokens differs by one substituted letter.
+    """
+    left, right = _letter_tokens(a), _letter_tokens(b)
+    if len(left) != len(right) or len(left) < 2:
+        return False
+    return any(
+        classify_letters(one, other) == "substitution"
+        for one, other in zip(left, right)
+    )
+
+
 def split_on_a_substitution(members: list[str]) -> list[list[str]]:
     """Split a cluster the model formed when one substituted letter sits inside it.
 
@@ -632,7 +673,10 @@ samplify never merges two names that differ by one substituted letter,
     """
     for index, left in enumerate(members):
         for right in members[index + 1:]:
-            if describe_difference(left, right) == "substitution":
+            if (
+                describe_difference(left, right) == "substitution"
+                or _a_token_is_substituted(left, right)
+            ):
                 by_skeleton: dict[str, list[str]] = {}
                 for member in members:
                     by_skeleton.setdefault(

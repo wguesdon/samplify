@@ -13,6 +13,34 @@ The version is below 1.0.0, and samplify is not ready for a release. Semantic
 Versioning gives the minor version the role of the major version below 1.0.0, so
 a change that alters the grouping bumps the minor version until 1.0.0.
 
+## [0.16.0] - 2026-08-19
+
+The seventh review with no list of past findings reports four major items and
+one medium item. Three of them lose data.
+
+### Fixed
+
+- A sign belongs to the word it touches. The identity signature recorded only
+  how many numbers stood before a sign, so `control+_batch1` and
+  `control_batch+1` both read `0+` and the two samples merged into one. The
+  entry now carries the word as well, read through the abbreviation table so
+  that `ctrl+` and `control+` still agree.
+- A row that holds more values than the header is refused, and the message names
+  the line. pandas reads the first column of that file as a row label, so the
+  header `sample_id,other` with the row `s1,x,extra` produced the name `x` and
+  the name `s1` was gone.
+- A NUL byte in any column is refused. The reader ends a value at that byte and
+  reports nothing, so a column samplify never touches reached the output cut
+  short.
+- A model answer that merges two names is refused when one token of the pair is
+  a substitution of the other. The rule read the whole pair, and it read a
+  single token only when that token was the only one to differ, so a model
+  merged `Primary B cells1` with `Primary T cellss1`. B cells and T cells are
+  two cell types.
+- A destination that is a directory is refused before the first file is written.
+  `--output out.csv --json-log /tmp` wrote the output CSV and then raised, which
+  contradicts the promise that samplify writes all of its files or none of them.
+
 ## [0.15.0] - 2026-08-19
 
 The sixth review with no list of past findings reports no major item. Its one
