@@ -277,7 +277,12 @@ def is_canonical(name: str) -> bool:
         name: The name to check.
 
     Returns:
-        True when the name contains only lower-case letters, digits and
-        underscores.
+        True when the name holds a character and every character is a
+        lower-case letter, a digit or an underscore.
     """
+    # An empty name is not canonical. The search finds nothing in an empty
+    # string, so the answer was True, and a caller that asked "may this name
+    # pass" was told yes about a name that identifies nothing.
+    if not name.strip("_") or not name.strip():
+        return False
     return not CANONICAL_CHARSET.search(name)

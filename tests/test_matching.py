@@ -1101,3 +1101,18 @@ def test_the_word_in_front_of_a_sign_is_read_through_the_abbreviation_table():
     assert matching.digit_signature("ctrl_batch1") == matching.digit_signature(
         "control_batch1"
     )
+
+
+@pytest.mark.parametrize("name", ["", "   ", "_", "__"])
+def test_a_name_that_identifies_nothing_is_not_canonical(name):
+    """The check answered yes about a name that holds no identity.
+
+    The search for a forbidden character finds nothing in an empty string, so
+    the answer was True and the guard read as permission.
+    """
+    assert rules.is_canonical(name) is False
+
+
+@pytest.mark.parametrize("name", ["sample_1", "s1", "1", "a_b_c_9"])
+def test_a_name_that_follows_the_rules_is_canonical(name):
+    assert rules.is_canonical(name) is True
