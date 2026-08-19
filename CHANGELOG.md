@@ -15,9 +15,16 @@ a change that alters the grouping bumps the minor version until 1.0.0.
 
 ## [0.19.0] - 2026-08-19
 
-The tenth review with no list of past findings reports one major item.
+The tenth review with no list of past findings reports one major item. The four
+live tests ran against the real service for the first time.
 
 ### Fixed
+
+- The live test of `harmonize_csv` asserted that its file holds three unique
+  names and it holds four. The assertion dates from the first commit of that
+  test in February 2026, and no live run had ever checked it. The four names
+  carry batch 1, batch 2, batch 3 and sample 2, so they are four samples and
+  none of them merges.
 
 - A NUL byte in the header is refused on every supported interpreter. Python
   3.10 and 3.11 raise inside the `csv` module and later versions keep the byte,

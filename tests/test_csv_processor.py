@@ -17,6 +17,7 @@ import pytest
 
 from samplify import mapping as mapping_module
 from samplify import matching
+from samplify import rules
 from samplify.csv_processor import apply_mapping, diagnose, harmonize_csv, propose, propose_csv
 from samplify.mapping import MappingFile
 
@@ -239,7 +240,19 @@ def test_harmonize_csv_live(tmp_path):
         assert key in log_data, f"Missing key in JSON log: {key}"
 
     assert log_data["summary"]["total_rows"] == 4
-    assert log_data["summary"]["unique_names"] == 3  # s-1-b3 shares sample_1_batch_1? No, 3 unique
+    # The file holds four names and each one is written a different way, so the
+    # count of unique names is four. The assertion read 3 from the first commit
+    # of this test in February 2026 and no live run had checked it.
+    assert log_data["summary"]["unique_names"] == 4
+    assert log_data["summary"]["names_in_the_mapping"] == 4
+    # The four names carry batch 1, batch 2, batch 3 and sample 2, so they are
+    # four samples and none of them merges. What the model does here is write
+    # each one in the canonical form and expand `b3` to `batch3`.
+    canonical = list(df_out["sample_id_canonical"])
+    assert len(set(canonical)) == 4
+    for name in canonical:
+        assert rules.is_canonical(name), name
+    assert all("batch" in name for name in canonical), canonical
 
     # CSV log has correct columns
     log_df = pd.read_csv(out_csv_log)
